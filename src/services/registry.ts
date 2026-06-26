@@ -145,9 +145,18 @@ export function mergeRegistries(
 export async function fetchFullRegistry(
   chainId: SupportedChainId,
 ): Promise<RegistryPair[]> {
-  const [official] = await Promise.all([fetchOfficialRegistry(chainId)]);
+  // Always start with hardcoded pairs so UI is never empty
   const custom = buildCustomRegistryPairs().filter((p) => p.chainId === chainId);
-  return mergeRegistries(official, custom);
+
+  try {
+    const official = await fetchOfficialRegistry(chainId);
+    // Merge: official on-chain pairs take precedence, then fill with custom
+    return mergeRegistries(official, custom);
+  } catch {
+    // If RPC fails, return the hardcoded pairs so UI still works
+    console.warn(`On-chain registry fetch failed for chain ${chainId}, using hardcoded pairs`);
+    return custom;
+  }
 }
 
 // ── Get single pair by ERC20 address ─────────────────────────
