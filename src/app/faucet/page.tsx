@@ -18,21 +18,14 @@ import { getTxUrl, formatDate, cooldownRemaining, formatCooldown } from '@/utils
 import { ConnectButton } from '@rainbow-me/rainbowkit';
 import type { FaucetToken } from '@/types';
 
-// Minimal faucet ABI — standard mint() or claim() function
+// Minimal faucet ABI — cTokenMock exposes public mint(address, uint256)
 const FAUCET_ABI = [
-  {
-    name: 'claim',
-    type: 'function',
-    stateMutability: 'nonpayable',
-    inputs: [],
-    outputs: [],
-  },
   {
     name: 'mint',
     type: 'function',
     stateMutability: 'nonpayable',
     inputs: [
-      { name: 'to',     type: 'address' },
+      { name: 'to', type: 'address' },
       { name: 'amount', type: 'uint256' },
     ],
     outputs: [],
@@ -41,7 +34,7 @@ const FAUCET_ABI = [
 
 function FaucetCard({ token }: { token: FaucetToken }) {
   const { address, isConnected } = useAccount();
-  const { chainId, explorerUrl } = useNetwork();
+  const { chainId } = useNetwork();
   const { addClaim, getLastClaim } = useFaucetStore();
 
   const [txHash, setTxHash] = useState<string | undefined>();
@@ -65,16 +58,17 @@ function FaucetCard({ token }: { token: FaucetToken }) {
     setIsClaiming(true);
     try {
       const hash = await writeContractAsync({
-        address:      token.address,
-        abi:          FAUCET_ABI,
-        functionName: 'claim',
+        address: token.address,
+        abi: FAUCET_ABI,
+        functionName: 'mint',
+        args: [address, token.claimAmount],
       });
       setTxHash(hash);
       addClaim({
         tokenAddress: token.address,
-        txHash:       hash,
-        claimedAt:    Date.now(),
-        amount:       token.claimAmount,
+        txHash: hash,
+        claimedAt: Date.now(),
+        amount: token.claimAmount,
       });
     } catch (err) {
       const msg = (err as { shortMessage?: string }).shortMessage ?? 'Claim failed';
@@ -157,10 +151,10 @@ function FaucetCard({ token }: { token: FaucetToken }) {
             isLoading={isClaming}
             variant={canClaim ? 'default' : 'secondary'}
           >
-            {!isConnected   ? 'Connect wallet'  :
-             !canClaim      ? 'On cooldown'      :
-             isClaming      ? 'Claiming…'        :
-             `Claim ${token.formattedClaimAmount} ${token.symbol}`}
+            {!isConnected ? 'Connect wallet' :
+              !canClaim ? 'On cooldown' :
+                isClaming ? 'Minting…' :
+                  `Claim ${token.formattedClaimAmount} ${token.symbol}`}
           </Button>
         </div>
       </CardContent>
@@ -169,7 +163,7 @@ function FaucetCard({ token }: { token: FaucetToken }) {
 }
 
 export default function FaucetPage() {
-  const { isConnected }  = useAccount();
+  const { isConnected } = useAccount();
   const { chainId, isSepolia } = useNetwork();
   const tokens = getFaucetTokensByChain(chainId);
   const { claims } = useFaucetStore();
