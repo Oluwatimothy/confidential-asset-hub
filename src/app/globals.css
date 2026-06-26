@@ -1,0 +1,115 @@
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+/* ── Design tokens ─────────────────────────────────────────── */
+@layer base {
+  :root {
+    /* All surfaces are dark by default */
+    --background:              0 0% 4%;       /* zinc-950 */
+    --foreground:              240 5% 96%;    /* zinc-100 */
+
+    --card:                    240 4% 7%;     /* zinc-900 */
+    --card-foreground:         240 5% 96%;
+
+    --popover:                 240 4% 7%;
+    --popover-foreground:      240 5% 96%;
+
+    /* Amber-400 as primary */
+    --primary:                 43 96% 56%;
+    --primary-foreground:      0 0% 4%;
+
+    --secondary:               240 3.7% 16%;  /* zinc-800 */
+    --secondary-foreground:    240 5% 96%;
+
+    --muted:                   240 3.7% 12%;
+    --muted-foreground:        240 5% 45%;
+
+    --accent:                  43 96% 56%;
+    --accent-foreground:       0 0% 4%;
+
+    --destructive:             0 72% 51%;
+    --destructive-foreground:  240 5% 96%;
+
+    --border:                  240 3.7% 16%;
+    --input:                   240 3.7% 16%;
+    --ring:                    43 96% 56%;
+
+    --radius:                  0.5rem;
+
+    /* Charts */
+    --chart-1:  43  96% 56%;   /* amber  */
+    --chart-2:  160 84% 39%;   /* emerald */
+    --chart-3:  217 91% 60%;   /* blue   */
+    --chart-4:  280 65% 60%;   /* purple */
+    --chart-5:   0  72% 51%;   /* red    */
+
+    /* Sidebar */
+    --sidebar-background:           0 0% 4%;
+    --sidebar-foreground:           240 5% 80%;
+    --sidebar-primary:              43 96% 56%;
+    --sidebar-primary-foreground:   0 0% 4%;
+    --sidebar-accent:               240 3.7% 12%;
+    --sidebar-accent-foreground:    240 5% 96%;
+    --sidebar-border:               240 3.7% 10%;
+    --sidebar-ring:                 43 96% 56%;
+  }
+}
+
+@layer base {
+  * {
+    @apply border-border;
+  }
+
+  html {
+    @apply antialiased;
+    font-feature-settings: "kern" 1, "liga" 1, "calt" 1;
+    -webkit-font-smoothing: antialiased;
+    -moz-osx-font-smoothing: grayscale;
+  }
+
+  body {
+    @apply bg-background text-foreground;
+    font-family: var(--font-geist-sans), system-ui, -apple-system, sans-serif;
+  }
+
+  /* Scrollbar styling */
+  ::-webkit-scrollbar       { width: 6px; height: 6px; }
+  ::-webkit-scrollbar-track { background: transparent; }
+  ::-webkit-scrollbar-thumb { background: #3f3f46; border-radius: 3px; }
+  ::-webkit-scrollbar-thumb:hover { background: #52525b; }
+}
+
+/* ── Utility classes ──────────────────────────────────────── */
+@layer components {
+  /* Subtle glow for active elements */
+  .glow-amber {
+    box-shadow: 0 0 20px theme('colors.amber.400' / 15%);
+  }
+
+  /* Monospace data display */
+  .font-data {
+    font-family: var(--font-geist-mono), 'SF Mono', monospace;
+    font-variant-numeric: tabular-nums;
+  }
+
+  /* Encrypted balance pill */
+  .encrypted-badge {
+    @apply inline-flex items-center gap-1.5 rounded-full border border-amber-400/20 
+           bg-amber-400/5 px-3 py-1 text-xs font-medium text-amber-400/70;
+  }
+
+  /* Transaction step indicator */
+  .step-item {
+    @apply flex items-center gap-3 rounded-lg p-3 transition-colors;
+  }
+  .step-item-active {
+    @apply bg-amber-400/10 border border-amber-400/20;
+  }
+  .step-item-done {
+    @apply bg-emerald-500/5 border border-emerald-500/20;
+  }
+  .step-item-pending {
+    @apply border border-transparent opacity-40;
+  }
+}
