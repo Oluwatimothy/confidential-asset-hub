@@ -19,7 +19,7 @@ export const CUSTOM_PAIRS: CustomPairEntry[] = [
   {
     token: {
       address: '0x9b5Cd13b8eFbB58Dc25A05CF411D8056058aDFfF',
-      name: 'USD Coin (Mock)',
+      name: 'USDC (Mock)',
       symbol: 'USDC',
       decimals: 6,
     },
