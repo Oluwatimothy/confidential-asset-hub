@@ -3,7 +3,7 @@
 // ============================================================
 'use client';
 
-import React, { useState } from 'react';
+import React, { useState, Suspense } from 'react';
 import { useSearchParams } from 'next/navigation';
 import { useAccount } from 'wagmi';
 import { motion } from 'framer-motion';
@@ -47,9 +47,9 @@ function DecryptedCard({ address }: { address: string }) {
 
 // ── Registry token list ─────────────────────────────────────────
 function RegistryTokenList({ onSelect }: { onSelect: (address: Address) => void }) {
-  const { pairs }  = useRegistry();
-  const { chainId }= useNetwork();
-  const results    = useDecryptStore((s) => s.results);
+  const { pairs } = useRegistry();
+  const { chainId } = useNetwork();
+  const results = useDecryptStore((s) => s.results);
 
   const activePairs = pairs.filter((p) => p.isValid && p.chainId === chainId);
 
@@ -58,7 +58,7 @@ function RegistryTokenList({ onSelect }: { onSelect: (address: Address) => void 
   return (
     <div className="space-y-2">
       {activePairs.map((pair, i) => {
-        const addr   = pair.confidentialToken.address.toLowerCase();
+        const addr = pair.confidentialToken.address.toLowerCase();
         const cached = results[addr];
         return (
           <div
@@ -95,14 +95,14 @@ function RegistryTokenList({ onSelect }: { onSelect: (address: Address) => void 
   );
 }
 
-export default function DecryptPage() {
-  const { isConnected }      = useAccount();
-  const searchParams         = useSearchParams();
-  const presetToken          = searchParams.get('token') as Address | null;
+function DecryptPageInner() {
+  const { isConnected } = useAccount();
+  const searchParams = useSearchParams();
+  const presetToken = searchParams.get('token') as Address | null;
 
-  const [mode, setMode]      = useState<'paste' | 'registry'>('registry');
+  const [mode, setMode] = useState<'paste' | 'registry'>('registry');
   const [pastedAddr, setPastedAddr] = useState(presetToken ?? '');
-  const [addrError, setAddrError]   = useState('');
+  const [addrError, setAddrError] = useState('');
 
   const { step, result, error, decrypt, reset } = useDecrypt();
 
@@ -169,11 +169,10 @@ export default function DecryptPage() {
           <button
             key={m}
             onClick={() => { setMode(m); reset(); }}
-            className={`flex-1 rounded-md py-2 text-sm font-medium transition-colors ${
-              mode === m
-                ? 'bg-zinc-800 text-zinc-100'
-                : 'text-zinc-500 hover:text-zinc-300'
-            }`}
+            className={`flex-1 rounded-md py-2 text-sm font-medium transition-colors ${mode === m
+              ? 'bg-zinc-800 text-zinc-100'
+              : 'text-zinc-500 hover:text-zinc-300'
+              }`}
           >
             {m === 'registry' ? '📋 Registry Tokens' : '🔍 Paste Address'}
           </button>
@@ -234,9 +233,9 @@ export default function DecryptPage() {
           <Loader2 className="h-5 w-5 text-amber-400 animate-spin" />
           <div>
             <p className="text-sm font-medium text-zinc-200">
-              {step === 'validating'         ? 'Validating token…'          :
-               step === 'awaiting-signature' ? 'Awaiting wallet signature…' :
-               'Decrypting balance…'}
+              {step === 'validating' ? 'Validating token…' :
+                step === 'awaiting-signature' ? 'Awaiting wallet signature…' :
+                  'Decrypting balance…'}
             </p>
             <p className="text-xs text-zinc-500 mt-0.5">
               {step === 'awaiting-signature' && 'Please sign the EIP-712 message in your wallet.'}
@@ -269,6 +268,13 @@ export default function DecryptPage() {
       {/* All decrypted results */}
       <AllResults />
     </div>
+  );
+}
+export default function DecryptPage() {
+  return (
+    <Suspense fallback={<div className="p-6 text-zinc-500 text-sm">Loading…</div>}>
+      <DecryptPageInner />
+    </Suspense>
   );
 }
 

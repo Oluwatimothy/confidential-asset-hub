@@ -3,7 +3,7 @@
 // ============================================================
 'use client';
 
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, Suspense } from 'react';
 import { useSearchParams } from 'next/navigation';
 import { useAccount } from 'wagmi';
 import { motion } from 'framer-motion';
@@ -25,21 +25,21 @@ import type { Address } from 'viem';
 
 // ── Step indicator ─────────────────────────────────────────────
 const STEPS = [
-  { key: 'checking-approval',          label: 'Check Approval'      },
-  { key: 'awaiting-approval-signature',label: 'Approve Token'       },
-  { key: 'approval-pending',           label: 'Confirming Approval' },
-  { key: 'awaiting-wrap-signature',    label: 'Sign Wrap'           },
-  { key: 'wrap-pending',               label: 'Wrap Pending'        },
-  { key: 'success',                    label: 'Complete'            },
+  { key: 'checking-approval', label: 'Check Approval' },
+  { key: 'awaiting-approval-signature', label: 'Approve Token' },
+  { key: 'approval-pending', label: 'Confirming Approval' },
+  { key: 'awaiting-wrap-signature', label: 'Sign Wrap' },
+  { key: 'wrap-pending', label: 'Wrap Pending' },
+  { key: 'success', label: 'Complete' },
 ];
 
 function StepIndicator({ currentStep }: { currentStep: string }) {
   return (
     <div className="space-y-2">
       {STEPS.map((s, i) => {
-        const idx   = STEPS.findIndex((x) => x.key === currentStep);
-        const done  = i < idx || currentStep === 'success';
-        const active= s.key === currentStep && currentStep !== 'success';
+        const idx = STEPS.findIndex((x) => x.key === currentStep);
+        const done = i < idx || currentStep === 'success';
+        const active = s.key === currentStep && currentStep !== 'success';
         return (
           <div
             key={s.key}
@@ -70,7 +70,7 @@ function PairSelector({
   selected,
   onSelect,
 }: {
-  pairs:    RegistryPair[];
+  pairs: RegistryPair[];
   selected: RegistryPair | null;
   onSelect: (p: RegistryPair) => void;
 }) {
@@ -80,11 +80,10 @@ function PairSelector({
         <button
           key={i}
           onClick={() => onSelect(pair)}
-          className={`flex items-center gap-3 rounded-xl border p-3 text-left transition-all ${
-            selected?.token.address === pair.token.address
-              ? 'border-amber-400/50 bg-amber-400/5'
-              : 'border-zinc-800 hover:border-zinc-700 hover:bg-zinc-900'
-          }`}
+          className={`flex items-center gap-3 rounded-xl border p-3 text-left transition-all ${selected?.token.address === pair.token.address
+            ? 'border-amber-400/50 bg-amber-400/5'
+            : 'border-zinc-800 hover:border-zinc-700 hover:bg-zinc-900'
+            }`}
         >
           <div className="flex h-8 w-8 items-center justify-center rounded-full bg-zinc-800 text-xs font-bold text-zinc-300 shrink-0">
             {pair.token.symbol.slice(0, 2)}
@@ -106,18 +105,18 @@ function PairSelector({
   );
 }
 
-export default function WrapPage() {
-  const { isConnected }  = useAccount();
-  const { chainId }      = useNetwork();
-  const { pairs }        = useRegistry();
-  const searchParams     = useSearchParams();
-  const presetToken      = searchParams.get('token') as Address | null;
+function WrapPageInner() {
+  const { isConnected } = useAccount();
+  const { chainId } = useNetwork();
+  const { pairs } = useRegistry();
+  const searchParams = useSearchParams();
+  const presetToken = searchParams.get('token') as Address | null;
 
   const validPairs = pairs.filter((p) => p.isValid && p.chainId === chainId);
 
   const [selectedPair, setSelectedPair] = useState<RegistryPair | null>(null);
-  const [amount, setAmount]             = useState('');
-  const [amountError, setAmountError]   = useState('');
+  const [amount, setAmount] = useState('');
+  const [amountError, setAmountError] = useState('');
 
   // Pre-select from URL param
   useEffect(() => {
@@ -132,17 +131,17 @@ export default function WrapPage() {
   const { step, txHash, error, wrap, reset, allowance, balance } = useWrap(
     selectedPair
       ? {
-          erc20Address:   selectedPair.token.address,
-          wrapperAddress: selectedPair.confidentialToken.address,
-          decimals:       selectedPair.token.decimals,
-          symbol:         selectedPair.token.symbol,
-        }
+        erc20Address: selectedPair.token.address,
+        wrapperAddress: selectedPair.confidentialToken.address,
+        decimals: selectedPair.token.decimals,
+        symbol: selectedPair.token.symbol,
+      }
       : {
-          erc20Address:   '0x0000000000000000000000000000000000000000',
-          wrapperAddress: '0x0000000000000000000000000000000000000000',
-          decimals:       18,
-          symbol:         '',
-        },
+        erc20Address: '0x0000000000000000000000000000000000000000',
+        wrapperAddress: '0x0000000000000000000000000000000000000000',
+        decimals: 18,
+        symbol: '',
+      },
   );
 
   const { explorerUrl } = useNetwork();
@@ -161,7 +160,7 @@ export default function WrapPage() {
     await wrap(amount);
   }
 
-  const isIdle    = step === 'idle' || step === 'error';
+  const isIdle = step === 'idle' || step === 'error';
   const isPending = !isIdle && step !== 'success';
   const isSuccess = step === 'success';
 
@@ -379,5 +378,12 @@ export default function WrapPage() {
         )}
       </div>
     </div>
+  );
+}
+export default function WrapPage() {
+  return (
+    <Suspense fallback={<div className="p-6 text-zinc-500 text-sm">Loading…</div>}>
+      <WrapPageInner />
+    </Suspense>
   );
 }

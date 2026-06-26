@@ -3,7 +3,7 @@
 // ============================================================
 'use client';
 
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, Suspense } from 'react';
 import { useSearchParams } from 'next/navigation';
 import { useAccount } from 'wagmi';
 import { motion } from 'framer-motion';
@@ -24,21 +24,21 @@ import type { RegistryPair } from '@/types';
 import type { Address } from 'viem';
 
 const STEPS = [
-  { key: 'encrypting-amount',          label: 'Encrypt Amount (SDK)'   },
-  { key: 'awaiting-unwrap-signature',  label: 'Sign Unwrap Request'    },
-  { key: 'unwrap-pending',             label: 'Unwrap Pending'         },
-  { key: 'awaiting-decryption',        label: 'Await Decryption Proof' },
-  { key: 'finalizing',                 label: 'Finalize Unwrap'        },
-  { key: 'success',                    label: 'Complete'               },
+  { key: 'encrypting-amount', label: 'Encrypt Amount (SDK)' },
+  { key: 'awaiting-unwrap-signature', label: 'Sign Unwrap Request' },
+  { key: 'unwrap-pending', label: 'Unwrap Pending' },
+  { key: 'awaiting-decryption', label: 'Await Decryption Proof' },
+  { key: 'finalizing', label: 'Finalize Unwrap' },
+  { key: 'success', label: 'Complete' },
 ];
 
 function StepIndicator({ currentStep }: { currentStep: string }) {
   return (
     <div className="space-y-2">
       {STEPS.map((s, i) => {
-        const idx   = STEPS.findIndex((x) => x.key === currentStep);
-        const done  = i < idx || currentStep === 'success';
-        const active= s.key === currentStep;
+        const idx = STEPS.findIndex((x) => x.key === currentStep);
+        const done = i < idx || currentStep === 'success';
+        const active = s.key === currentStep;
         return (
           <div key={s.key} className={`step-item ${done ? 'step-item-done' : active ? 'step-item-active' : 'step-item-pending'}`}>
             <div className="flex h-5 w-5 shrink-0 items-center justify-center rounded-full text-xs">
@@ -60,16 +60,16 @@ function StepIndicator({ currentStep }: { currentStep: string }) {
   );
 }
 
-export default function UnwrapPage() {
-  const { isConnected }  = useAccount();
-  const { chainId }      = useNetwork();
-  const { pairs }        = useRegistry();
-  const searchParams     = useSearchParams();
-  const presetToken      = searchParams.get('token') as Address | null;
+function UnwrapPageInner() {
+  const { isConnected } = useAccount();
+  const { chainId } = useNetwork();
+  const { pairs } = useRegistry();
+  const searchParams = useSearchParams();
+  const presetToken = searchParams.get('token') as Address | null;
 
   const validPairs = pairs.filter((p) => p.isValid && p.chainId === chainId);
   const [selectedPair, setSelectedPair] = useState<RegistryPair | null>(null);
-  const [amount, setAmount]             = useState('');
+  const [amount, setAmount] = useState('');
 
   useEffect(() => {
     if (presetToken && validPairs.length > 0) {
@@ -83,18 +83,18 @@ export default function UnwrapPage() {
   const { step, txHash, finalizeTxHash, error, unwrap, finalizeUnwrap, reset } = useUnwrap(
     selectedPair
       ? {
-          wrapperAddress: selectedPair.confidentialToken.address,
-          decimals:       selectedPair.confidentialToken.decimals,
-          symbol:         selectedPair.confidentialToken.symbol,
-        }
+        wrapperAddress: selectedPair.confidentialToken.address,
+        decimals: selectedPair.confidentialToken.decimals,
+        symbol: selectedPair.confidentialToken.symbol,
+      }
       : {
-          wrapperAddress: '0x0000000000000000000000000000000000000000',
-          decimals:       6,
-          symbol:         '',
-        },
+        wrapperAddress: '0x0000000000000000000000000000000000000000',
+        decimals: 6,
+        symbol: '',
+      },
   );
 
-  const isIdle    = step === 'idle' || step === 'error';
+  const isIdle = step === 'idle' || step === 'error';
   const isPending = !isIdle && step !== 'success';
   const isSuccess = step === 'success';
 
@@ -153,11 +153,10 @@ export default function UnwrapPage() {
                 <button
                   key={i}
                   onClick={() => { setSelectedPair(pair); reset(); }}
-                  className={`w-full flex items-center gap-3 rounded-xl border p-3 text-left transition-all ${
-                    selectedPair?.confidentialToken.address === pair.confidentialToken.address
-                      ? 'border-amber-400/50 bg-amber-400/5'
-                      : 'border-zinc-800 hover:border-zinc-700 hover:bg-zinc-900'
-                  }`}
+                  className={`w-full flex items-center gap-3 rounded-xl border p-3 text-left transition-all ${selectedPair?.confidentialToken.address === pair.confidentialToken.address
+                    ? 'border-amber-400/50 bg-amber-400/5'
+                    : 'border-zinc-800 hover:border-zinc-700 hover:bg-zinc-900'
+                    }`}
                 >
                   <div className="flex h-8 w-8 items-center justify-center rounded-full bg-amber-400/10 text-xs font-bold text-amber-400 shrink-0">
                     c
@@ -292,5 +291,12 @@ export default function UnwrapPage() {
         )}
       </div>
     </div>
+  );
+}
+export default function UnwrapPage() {
+  return (
+    <Suspense fallback={<div className="p-6 text-zinc-500 text-sm">Loading…</div>}>
+      <UnwrapPageInner />
+    </Suspense>
   );
 }
