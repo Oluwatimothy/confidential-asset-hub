@@ -137,15 +137,15 @@ function PairRow({ pair }: { pair: RegistryPair }) {
 
 export default function RegistryPage() {
   const { pairs, isLoading, refetch, isSyncing, lastSyncedAt } = useRegistry();
-  const [search, setSearch]   = useState('');
-  const [filter, setFilter]   = useState<FilterMode>('all');
+  const [search, setSearch] = useState('');
+  const [filter, setFilter] = useState<FilterMode>('all');
 
   const filtered = useMemo(() => {
     let result = pairs;
     if (filter === 'official') result = result.filter((p) => p.source === 'official');
-    if (filter === 'custom')   result = result.filter((p) => p.source === 'custom');
-    if (filter === 'valid')    result = result.filter((p) => p.isValid);
-    if (filter === 'revoked')  result = result.filter((p) => !p.isValid);
+    if (filter === 'custom') result = result.filter((p) => p.source === 'custom');
+    if (filter === 'valid') result = result.filter((p) => p.isValid);
+    if (filter === 'revoked') result = result.filter((p) => !p.isValid);
 
     if (search.trim()) {
       const q = search.toLowerCase();
@@ -162,11 +162,11 @@ export default function RegistryPage() {
   }, [pairs, filter, search]);
 
   const filters: { label: string; value: FilterMode }[] = [
-    { label: 'All',      value: 'all'     },
-    { label: 'Official', value: 'official'},
-    { label: 'Custom',   value: 'custom'  },
-    { label: 'Valid',    value: 'valid'   },
-    { label: 'Revoked',  value: 'revoked' },
+    { label: 'All', value: 'all' },
+    { label: 'Official', value: 'official' },
+    { label: 'Custom', value: 'custom' },
+    { label: 'Valid', value: 'valid' },
+    { label: 'Revoked', value: 'revoked' },
   ];
 
   return (
@@ -208,11 +208,10 @@ export default function RegistryPage() {
             <button
               key={f.value}
               onClick={() => setFilter(f.value)}
-              className={`px-3 py-1.5 rounded-lg text-xs font-medium transition-colors ${
-                filter === f.value
+              className={`px-3 py-1.5 rounded-lg text-xs font-medium transition-colors ${filter === f.value
                   ? 'bg-amber-400 text-zinc-950'
                   : 'bg-zinc-800 text-zinc-400 hover:text-zinc-200 hover:bg-zinc-700'
-              }`}
+                }`}
             >
               {f.label}
             </button>
