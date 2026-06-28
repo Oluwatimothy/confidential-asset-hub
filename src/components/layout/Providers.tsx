@@ -32,16 +32,19 @@ const rainbowTheme = darkTheme({
 });
 
 // Override relayerUrl to route through our CORS proxy
+const baseUrl = typeof window !== 'undefined'
+  ? window.location.origin
+  : 'http://localhost:3000';
+
 const sepoliaWithProxy = {
   ...sepolia,
-  relayerUrl: '/api/relayer/sepolia',
+  relayerUrl: `${baseUrl}/api/relayer/sepolia`,
 };
 
 const mainnetWithProxy = {
   ...mainnet,
-  relayerUrl: '/api/relayer/mainnet',
+  relayerUrl: `${baseUrl}/api/relayer/mainnet`,
 };
-
 const zamaChains = [sepoliaWithProxy, mainnetWithProxy] as const;
 
 const zamaConfig = createZamaConfig({
