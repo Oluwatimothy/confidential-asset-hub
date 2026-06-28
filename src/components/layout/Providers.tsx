@@ -9,7 +9,6 @@ import { ZamaProvider } from '@zama-fhe/react-sdk';
 import { createConfig as createZamaConfig } from '@zama-fhe/react-sdk/wagmi';
 import { web } from '@zama-fhe/sdk/web';
 import { sepolia, mainnet } from '@zama-fhe/sdk/chains';
-import { indexedDBStorage } from '@zama-fhe/sdk';
 
 import '@rainbow-me/rainbowkit/styles.css';
 
@@ -32,14 +31,15 @@ const rainbowTheme = darkTheme({
   overlayBlur: 'small',
 });
 
+const zamaChains = [sepolia, mainnet] as const;
+
 const zamaConfig = createZamaConfig({
   wagmiConfig,
-  chains: [sepolia, mainnet],
+  chains: zamaChains,
   relayers: {
     [sepolia.id]: web(),
     [mainnet.id]: web(),
   },
-  storage: typeof window !== 'undefined' ? indexedDBStorage : undefined,
 });
 
 export function Providers({ children }: { children: React.ReactNode }) {
