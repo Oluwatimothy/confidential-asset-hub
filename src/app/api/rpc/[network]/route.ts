@@ -1,8 +1,8 @@
 import { NextRequest, NextResponse } from 'next/server';
 
 const RPC_URLS: Record<string, string> = {
-    sepolia: process.env.SEPOLIA_RPC_URL ?? 'https://eth-sepolia.public.blastapi.io',
-    mainnet: process.env.MAINNET_RPC_URL ?? 'https://eth-mainnet.public.blastapi.io',
+    sepolia: process.env.SEPOLIA_RPC_URL ?? 'https://ethereum-sepolia-rpc.publicnode.com',
+    mainnet: process.env.MAINNET_RPC_URL ?? 'https://ethereum-rpc.publicnode.com',
 };
 
 export async function POST(
@@ -14,21 +14,40 @@ export async function POST(
 
     try {
         const body = await request.text();
+
         const response = await fetch(rpcUrl, {
             method: 'POST',
-            headers: { 'Content-Type': 'application/json' },
+            headers: {
+                'Content-Type': 'application/json',
+                'Accept': 'application/json',
+            },
             body,
         });
+
         const data = await response.text();
+
         return new NextResponse(data, {
-            status: response.status,
-            headers: { 'Content-Type': 'application/json' },
+            status: 200,
+            headers: {
+                'Content-Type': 'application/json',
+                'Access-Control-Allow-Origin': '*',
+            },
         });
     } catch (err) {
-        return NextResponse.json({ error: String(err) }, { status: 500 });
+        return NextResponse.json(
+            { jsonrpc: '2.0', error: { code: -32603, message: String(err) }, id: null },
+            { status: 200 },
+        );
     }
 }
 
 export async function OPTIONS() {
-    return new NextResponse(null, { status: 200 });
+    return new NextResponse(null, {
+        status: 200,
+        headers: {
+            'Access-Control-Allow-Origin': '*',
+            'Access-Control-Allow-Methods': 'POST, OPTIONS',
+            'Access-Control-Allow-Headers': 'Content-Type',
+        },
+    });
 }
