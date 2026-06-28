@@ -1,29 +1,26 @@
-// ============================================================
-// app/faucet/page.tsx — Faucet Center
-// ============================================================
 'use client';
 
 import React, { useState } from 'react';
 import { useAccount, useWriteContract, useWaitForTransactionReceipt } from 'wagmi';
 import { motion } from 'framer-motion';
-import { Droplets, CheckCircle2, Clock, AlertCircle, ExternalLink } from 'lucide-react';
+import { Droplets, CheckCircle2, AlertCircle, ExternalLink, Loader2 } from 'lucide-react';
 import {
   Card, CardContent, CardHeader, CardTitle, CardDescription,
-  Button, Badge,
+  Button, Input, Label, Badge,
 } from '@/components/ui';
 import { useFaucetStore } from '@/stores';
 import { useNetwork } from '@/hooks/use-network';
 import { getFaucetTokensByChain } from '@/config/faucet-tokens';
-import { getTxUrl, formatDate, cooldownRemaining, formatCooldown } from '@/utils';
+import { getTxUrl, formatDate, parseContractError } from '@/utils';
 import { ConnectButton } from '@rainbow-me/rainbowkit';
+import { parseUnits } from 'viem';
 import type { FaucetToken } from '@/types';
 
-// Minimal faucet ABI — cTokenMock exposes public mint(address, uint256)
 const FAUCET_ABI = [
   {
     name: 'mint',
-    type: 'function',
-    stateMutability: 'nonpayable',
+    type: 'function' as const,
+    stateMutability: 'nonpayable' as const,
     inputs: [
       { name: 'to', type: 'address' },
       { name: 'amount', type: 'uint256' },
@@ -32,59 +29,85 @@ const FAUCET_ABI = [
   },
 ] as const;
 
+type ClaimStatus = 'idle' | 'processing' | 'success' | 'error';
+
 function FaucetCard({ token }: { token: FaucetToken }) {
   const { address, isConnected } = useAccount();
   const { chainId } = useNetwork();
-  const { addClaim, getLastClaim } = useFaucetStore();
+  const { addClaim } = useFaucetStore();
 
+  const [status, setStatus] = useState<ClaimStatus>('idle');
   const [txHash, setTxHash] = useState<string | undefined>();
-  const [isClaming, setIsClaiming] = useState(false);
-  const [error, setError] = useState<string | null>(null);
+  const [errorMsg, setErrorMsg] = useState<string | null>(null);
+  const [amount, setAmount] = useState('100');
+  const [amountError, setAmountError] = useState('');
 
   const { writeContractAsync } = useWriteContract();
-  const { isSuccess: isTxConfirmed } = useWaitForTransactionReceipt({
+
+  const { data: receipt, isSuccess: txSuccess, isError: txError } = useWaitForTransactionReceipt({
     hash: txHash as `0x${string}` | undefined,
+    query: { enabled: !!txHash && status === 'processing' },
   });
 
-  const lastClaim = getLastClaim(token.address);
-  const cooldownLeft = lastClaim
-    ? cooldownRemaining(lastClaim.claimedAt, token.cooldownSeconds)
-    : 0;
-  const canClaim = cooldownLeft === 0;
+  React.useEffect(() => {
+    if (!txHash || status !== 'processing') return;
+    if (txSuccess && receipt) {
+      if (receipt.status === 'reverted') {
+        setStatus('error');
+        setErrorMsg('Transaction reverted on-chain.');
+      } else {
+        setStatus('success');
+        addClaim({
+          tokenAddress: token.address,
+          txHash,
+          claimedAt: Date.now(),
+          amount: parseUnits(amount, token.decimals),
+        });
+      }
+    }
+    if (txError) {
+      setStatus('error');
+      setErrorMsg('Transaction failed on-chain.');
+    }
+  }, [txSuccess, txError, receipt, txHash, status]);
+
+  function validateAmount(): boolean {
+    const num = parseFloat(amount);
+    if (isNaN(num) || num <= 0) { setAmountError('Enter a valid amount'); return false; }
+    if (num > 10000) { setAmountError('Maximum is 10,000'); return false; }
+    setAmountError('');
+    return true;
+  }
 
   async function handleClaim() {
-    if (!address || !canClaim) return;
-    setError(null);
-    setIsClaiming(true);
+    if (!address || !validateAmount()) return;
+    setStatus('processing');
+    setErrorMsg(null);
+    setTxHash(undefined);
     try {
       const hash = await writeContractAsync({
         address: token.address,
         abi: FAUCET_ABI,
         functionName: 'mint',
-        args: [address, token.claimAmount],
+        args: [address, parseUnits(amount, token.decimals)],
       });
       setTxHash(hash);
-      addClaim({
-        tokenAddress: token.address,
-        txHash: hash,
-        claimedAt: Date.now(),
-        amount: token.claimAmount,
-      });
     } catch (err) {
-      const msg = (err as { shortMessage?: string }).shortMessage ?? 'Claim failed';
-      if (msg.includes('User rejected')) {
-        setError('Transaction rejected.');
+      const msg = parseContractError(err);
+      if (msg.includes('rejected')) {
+        setStatus('idle');
       } else {
-        setError(msg);
+        setStatus('error');
+        setErrorMsg(msg);
       }
-    } finally {
-      setIsClaiming(false);
     }
   }
 
+  const explorerUrl = txHash ? getTxUrl(txHash, chainId) : undefined;
+
   return (
     <Card className="hover:border-zinc-700 transition-colors">
-      <CardContent className="p-5">
+      <CardContent className="p-5 space-y-4">
         <div className="flex items-start justify-between gap-3">
           <div className="flex items-center gap-3">
             <div className="flex h-10 w-10 items-center justify-center rounded-full bg-zinc-800 text-sm font-bold text-zinc-300 shrink-0">
@@ -95,68 +118,57 @@ function FaucetCard({ token }: { token: FaucetToken }) {
                 <p className="text-sm font-semibold text-zinc-100">{token.name}</p>
                 <Badge variant="secondary">{token.symbol}</Badge>
               </div>
-              <p className="text-xs text-zinc-500 mt-0.5 font-data">{token.address.slice(0, 16)}…</p>
+              <p className="text-xs text-zinc-500 mt-0.5 font-data">{token.address.slice(0, 18)}…</p>
             </div>
           </div>
           <div className="text-right shrink-0">
-            <p className="text-xs text-zinc-500">Claim amount</p>
-            <p className="text-sm font-bold text-amber-400">
-              {token.formattedClaimAmount} {token.symbol}
-            </p>
+            <p className="text-xs text-zinc-500">Max per claim</p>
+            <p className="text-sm font-bold text-amber-400">10,000 {token.symbol}</p>
           </div>
         </div>
 
-        <div className="mt-4 space-y-3">
-          {isTxConfirmed && (
-            <motion.div
-              initial={{ opacity: 0 }}
-              animate={{ opacity: 1 }}
-              className="flex items-center gap-2 rounded-lg border border-emerald-500/30 bg-emerald-500/5 px-3 py-2"
-            >
-              <CheckCircle2 className="h-4 w-4 text-emerald-400" />
-              <span className="text-xs text-emerald-400">Claimed successfully</span>
-              {txHash && (
-                <a
-                  href={getTxUrl(txHash, chainId)}
-                  target="_blank"
-                  rel="noopener noreferrer"
-                  className="ml-auto text-zinc-500 hover:text-amber-400"
-                >
-                  <ExternalLink className="h-3 w-3" />
-                </a>
-              )}
-            </motion.div>
-          )}
+        {(status === 'idle' || status === 'error') && (
+          <div className="space-y-1.5">
+            <Label htmlFor={`amount-${token.address}`}>Amount to claim</Label>
+            <Input id={`amount-${token.address}`} type="number" min="1" max="10000" value={amount} onChange={(e) => { setAmount(e.target.value); setAmountError(''); }} error={amountError} placeholder="100" />
+          </div>
+        )}
 
-          {error && (
-            <div className="flex items-center gap-2 rounded-lg border border-red-500/30 bg-red-500/5 px-3 py-2">
-              <AlertCircle className="h-4 w-4 text-red-400" />
-              <span className="text-xs text-red-400">{error}</span>
+        {status === 'processing' && (
+          <motion.div initial={{ opacity: 0 }} animate={{ opacity: 1 }} className="flex items-center gap-3 rounded-xl border border-amber-400/30 bg-amber-400/5 px-4 py-3">
+            <Loader2 className="h-4 w-4 text-amber-400 animate-spin shrink-0" />
+            <div>
+              <p className="text-sm font-medium text-amber-400">Processing…</p>
+              <p className="text-xs text-zinc-500 mt-0.5">Waiting for confirmation on Sepolia</p>
+              {explorerUrl && <a href={explorerUrl} target="_blank" rel="noopener noreferrer" className="text-xs text-zinc-500 hover:text-amber-400 flex items-center gap-1 mt-1">View on Etherscan <ExternalLink className="h-3 w-3" /></a>}
             </div>
-          )}
+          </motion.div>
+        )}
 
-          {!canClaim && (
-            <div className="flex items-center gap-2 rounded-lg bg-zinc-800/50 px-3 py-2">
-              <Clock className="h-4 w-4 text-zinc-500" />
-              <span className="text-xs text-zinc-500">
-                Next claim in {formatCooldown(cooldownLeft)}
-              </span>
+        {status === 'success' && (
+          <motion.div initial={{ opacity: 0, scale: 0.97 }} animate={{ opacity: 1, scale: 1 }} className="flex items-center gap-3 rounded-xl border border-emerald-500/30 bg-emerald-500/5 px-4 py-3">
+            <CheckCircle2 className="h-5 w-5 text-emerald-400 shrink-0" />
+            <div>
+              <p className="text-sm font-medium text-emerald-400">{amount} {token.symbol} claimed!</p>
+              {explorerUrl && <a href={explorerUrl} target="_blank" rel="noopener noreferrer" className="text-xs text-zinc-500 hover:text-amber-400 flex items-center gap-1 mt-1">View transaction <ExternalLink className="h-3 w-3" /></a>}
             </div>
-          )}
+          </motion.div>
+        )}
 
-          <Button
-            className="w-full"
-            onClick={handleClaim}
-            disabled={!isConnected || !canClaim || isClaming}
-            isLoading={isClaming}
-            variant={canClaim ? 'default' : 'secondary'}
-          >
-            {!isConnected ? 'Connect wallet' :
-              !canClaim ? 'On cooldown' :
-                isClaming ? 'Minting…' :
-                  `Claim ${token.formattedClaimAmount} ${token.symbol}`}
-          </Button>
-        </div>
+        {status === 'error' && (
+          <motion.div initial={{ opacity: 0 }} animate={{ opacity: 1 }} className="flex items-start gap-3 rounded-xl border border-red-500/30 bg-red-500/5 px-4 py-3">
+            <AlertCircle className="h-4 w-4 text-red-400 shrink-0 mt-0.5" />
+            <div>
+              <p className="text-sm font-medium text-red-400">Claim failed</p>
+              {errorMsg && <p className="text-xs text-zinc-500 mt-0.5">{errorMsg}</p>}
+            </div>
+          </motion.div>
+        )}
+
+        {status === 'idle' && <Button className="w-full" onClick={handleClaim} disabled={!isConnected}>{!isConnected ? 'Connect wallet' : `Claim ${token.symbol}`}</Button>}
+        {status === 'processing' && <Button className="w-full" disabled isLoading>Processing…</Button>}
+        {status === 'success' && <Button variant="outline" className="w-full" onClick={() => { setStatus('idle'); setTxHash(undefined); setErrorMsg(null); }}>Claim more</Button>}
+        {status === 'error' && <Button className="w-full" onClick={() => { setStatus('idle'); setErrorMsg(null); }}>Try again</Button>}
       </CardContent>
     </Card>
   );
@@ -182,41 +194,29 @@ export default function FaucetPage() {
     <div className="space-y-6">
       <div>
         <h2 className="text-xl font-bold text-zinc-100">Faucet Center</h2>
-        <p className="text-sm text-zinc-500 mt-1">
-          Claim mock ERC20 tokens on Sepolia to test wrapping and confidential transfers.
-        </p>
+        <p className="text-sm text-zinc-500 mt-1">Claim mock ERC20 tokens on Sepolia. Max 10,000 per claim.</p>
       </div>
 
       {!isSepolia && (
         <div className="rounded-xl border border-amber-400/30 bg-amber-400/5 p-4">
           <p className="text-sm text-amber-400 font-medium">Switch to Sepolia</p>
-          <p className="text-xs text-zinc-400 mt-1">
-            Faucet tokens are only available on Sepolia testnet.
-          </p>
+          <p className="text-xs text-zinc-400 mt-1">Faucet tokens are only available on Sepolia testnet.</p>
         </div>
       )}
 
-      {/* Faucet tokens */}
       <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
-        {tokens.map((token) => (
-          <FaucetCard key={token.address} token={token} />
-        ))}
+        {tokens.map((token) => <FaucetCard key={token.address} token={token} />)}
       </div>
 
       {tokens.length === 0 && (
         <Card>
           <CardContent className="flex flex-col items-center py-12">
             <Droplets className="h-8 w-8 text-zinc-700 mb-3" />
-            <p className="text-sm text-zinc-400">No faucet tokens configured</p>
-            <p className="text-xs text-zinc-600 mt-1">
-              Update <code className="font-data text-amber-400/70">config/faucet-tokens.ts</code> with
-              testnet token addresses.
-            </p>
+            <p className="text-sm text-zinc-400">No faucet tokens configured for this network</p>
           </CardContent>
         </Card>
       )}
 
-      {/* Claim history */}
       {claims.length > 0 && (
         <Card>
           <CardHeader className="pb-3">
@@ -225,20 +225,12 @@ export default function FaucetPage() {
           </CardHeader>
           <CardContent className="pt-0 space-y-2">
             {claims.slice(0, 10).map((claim, i) => (
-              <div
-                key={i}
-                className="flex items-center justify-between rounded-lg bg-zinc-900/60 px-3 py-2"
-              >
+              <div key={i} className="flex items-center justify-between rounded-lg bg-zinc-900/60 px-3 py-2">
                 <div>
-                  <p className="text-xs font-data text-zinc-400">{claim.tokenAddress.slice(0, 16)}…</p>
+                  <p className="text-xs font-data text-zinc-400">{claim.tokenAddress.slice(0, 18)}…</p>
                   <p className="text-xs text-zinc-600">{formatDate(claim.claimedAt)}</p>
                 </div>
-                <a
-                  href={`https://sepolia.etherscan.io/tx/${claim.txHash}`}
-                  target="_blank"
-                  rel="noopener noreferrer"
-                  className="text-zinc-600 hover:text-amber-400"
-                >
+                <a href={`https://sepolia.etherscan.io/tx/${claim.txHash}`} target="_blank" rel="noopener noreferrer" className="text-zinc-600 hover:text-amber-400">
                   <ExternalLink className="h-3.5 w-3.5" />
                 </a>
               </div>
