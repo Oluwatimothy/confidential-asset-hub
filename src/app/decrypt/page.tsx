@@ -20,7 +20,13 @@ import { ConnectButton } from '@rainbow-me/rainbowkit';
 import type { Address } from 'viem';
 import type { RegistryPair } from '@/types';
 
-// ── Single token card ─────────────────────────────────────────
+// Encrypted handles are astronomically large bigints — real balances never exceed this
+const MAX_REAL_BALANCE = 10n ** 30n;
+
+function isRealBalance(val: bigint | undefined): val is bigint {
+  return val !== undefined && val < MAX_REAL_BALANCE;
+}
+
 function TokenDecryptCard({ pair }: { pair: RegistryPair }) {
   const { address } = useAccount();
   const { setResult } = useDecryptStore();
@@ -30,32 +36,29 @@ function TokenDecryptCard({ pair }: { pair: RegistryPair }) {
     contractAddresses: [contractAddress],
   });
 
-  const { mutateAsync: grantPermit, isPending: granting, error: grantError, reset: resetGrant } = useGrantPermit();
-
-  // Only runs when permit exists — returns actual decrypted bigint
   const {
-    data: decryptedBalance,
+    mutateAsync: grantPermit,
+    isPending: granting,
+    error: grantError,
+    reset: resetGrant,
+  } = useGrantPermit();
+
+  const {
+    data: rawBalance,
     isLoading: balanceLoading,
     refetch: refetchBalance,
     error: balanceError,
-  }
+  } = useConfidentialBalance(
+    { address: contractAddress, account: address },
+    { enabled: !!hasPermit && !!address },
+  );
 
-    = useConfidentialBalance(
-      { address: contractAddress, account: address },
-      { enabled: !!hasPermit && !!address },
-    );
+  // Only treat it as a real balance if it's a sane number
+  const decryptedBalance = isRealBalance(rawBalance) ? rawBalance : undefined;
 
+  // Cache whenever we get a real balance
   React.useEffect(() => {
-    console.log('DEBUG', pair.confidentialToken.symbol, {
-      hasPermit,
-      decryptedBalance: decryptedBalance?.toString(),
-      balanceLoading,
-    });
-  }, [hasPermit, decryptedBalance, balanceLoading]);
-
-  // Cache result when we get a real balance
-  React.useEffect(() => {
-    if (decryptedBalance !== undefined && decryptedBalance >= 0n) {
+    if (decryptedBalance !== undefined) {
       setResult(contractAddress, {
         address: contractAddress,
         symbol: pair.confidentialToken.symbol,
@@ -65,7 +68,7 @@ function TokenDecryptCard({ pair }: { pair: RegistryPair }) {
         decryptedAt: Date.now(),
       });
     }
-  }, [decryptedBalance]);
+  }, [decryptedBalance?.toString()]);
 
   const cachedResult = useDecryptStore(
     (s) => s.results[contractAddress.toLowerCase()],
@@ -82,15 +85,17 @@ function TokenDecryptCard({ pair }: { pair: RegistryPair }) {
     }
   }
 
+  async function handleRefresh() {
+    await recheckPermit();
+    await refetchBalance();
+  }
+
   const error = grantError || balanceError;
   const isLoading = granting || balanceLoading;
 
-  // What to show as the balance
   const displayBalance = decryptedBalance !== undefined
     ? formatTokenAmount(decryptedBalance, pair.confidentialToken.decimals)
     : cachedResult?.formattedBalance;
-
-  const displayTime = cachedResult?.decryptedAt;
 
   return (
     <div className="rounded-xl border border-zinc-800 bg-zinc-900 p-4 space-y-3">
@@ -105,12 +110,13 @@ function TokenDecryptCard({ pair }: { pair: RegistryPair }) {
           </div>
         </div>
 
-        {/* Balance display */}
         {displayBalance !== undefined ? (
           <div className="text-right shrink-0">
             <p className="font-data text-xl font-bold text-emerald-400">{displayBalance}</p>
             <p className="text-[10px] text-zinc-500">{pair.confidentialToken.symbol}</p>
-            {displayTime && <p className="text-[10px] text-zinc-600">{timeAgo(displayTime)}</p>}
+            {cachedResult?.decryptedAt && (
+              <p className="text-[10px] text-zinc-600">{timeAgo(cachedResult.decryptedAt)}</p>
+            )}
           </div>
         ) : (
           <div className="text-right shrink-0">
@@ -119,25 +125,34 @@ function TokenDecryptCard({ pair }: { pair: RegistryPair }) {
         )}
       </div>
 
-      {/* Action area */}
-      {!hasPermit ? (
-        <div className="space-y-2">
-          <div className="flex items-center gap-1.5 text-xs text-zinc-500">
-            <KeyRound className="h-3.5 w-3.5" />
-            <span>One-time EIP-712 signature required — no gas, free</span>
-          </div>
-          <Button className="w-full" onClick={handleGrantAndDecrypt} isLoading={isLoading} disabled={!address || isLoading}>
-            {granting ? 'Sign in wallet…' : balanceLoading ? 'Decrypting…' : 'Sign Permit & Decrypt'}
-          </Button>
-        </div>
-      ) : (
+      {hasPermit ? (
         <div className="flex items-center justify-between">
           <div className="flex items-center gap-1.5 text-xs text-emerald-400/70">
             <CheckCircle2 className="h-3.5 w-3.5" />
             <span>Permit active</span>
           </div>
-          <Button size="sm" variant="outline" onClick={() => refetchBalance()} isLoading={balanceLoading}>
-            Refresh
+          <Button
+            size="sm"
+            variant="outline"
+            onClick={handleRefresh}
+            isLoading={balanceLoading}
+          >
+            Refresh Balance
+          </Button>
+        </div>
+      ) : (
+        <div className="space-y-2">
+          <div className="flex items-center gap-1.5 text-xs text-zinc-500">
+            <KeyRound className="h-3.5 w-3.5" />
+            <span>One-time EIP-712 signature — no gas, free</span>
+          </div>
+          <Button
+            className="w-full"
+            onClick={handleGrantAndDecrypt}
+            isLoading={isLoading}
+            disabled={!address || isLoading}
+          >
+            {granting ? 'Sign in wallet…' : balanceLoading ? 'Decrypting…' : 'Sign Permit & Decrypt'}
           </Button>
         </div>
       )}
@@ -152,7 +167,6 @@ function TokenDecryptCard({ pair }: { pair: RegistryPair }) {
   );
 }
 
-// ── Paste any address mode ────────────────────────────────────
 function PasteDecrypt() {
   const { address } = useAccount();
   const [addr, setAddr] = useState('');
@@ -164,16 +178,38 @@ function PasteDecrypt() {
     contractAddresses: submitted ? [submitted] : [],
   });
 
-  const { mutateAsync: grantPermit, isPending: granting, error: grantError } = useGrantPermit();
+  const {
+    mutateAsync: grantPermit,
+    isPending: granting,
+    error: grantError,
+  } = useGrantPermit();
 
-  const { data: decryptedBalance, isLoading: balanceLoading, refetch: refetchBalance } =
-    useConfidentialBalance(
-      {
-        address: submitted ?? '0x0000000000000000000000000000000000000000',
-        account: address,
-      },
-      { enabled: !!hasPermit && !!submitted && !!address },
-    );
+  const {
+    data: rawBalance,
+    isLoading: balanceLoading,
+    refetch: refetchBalance,
+  } = useConfidentialBalance(
+    {
+      address: submitted ?? '0x0000000000000000000000000000000000000000',
+      account: address,
+    },
+    { enabled: !!hasPermit && !!submitted && !!address },
+  );
+
+  const decryptedBalance = isRealBalance(rawBalance) ? rawBalance : undefined;
+
+  React.useEffect(() => {
+    if (decryptedBalance !== undefined && submitted) {
+      setResult(submitted, {
+        address: submitted,
+        symbol: 'TOKEN',
+        name: 'Custom Token',
+        decryptedBalance,
+        formattedBalance: formatTokenAmount(decryptedBalance, 18),
+        decryptedAt: Date.now(),
+      });
+    }
+  }, [decryptedBalance?.toString()]);
 
   function handleLoad() {
     if (!isValidAddress(addr)) { setAddrError('Invalid Ethereum address'); return; }
@@ -186,17 +222,7 @@ function PasteDecrypt() {
     try {
       await grantPermit([submitted]);
       await recheckPermit();
-      const result = await refetchBalance();
-      if (result.data !== undefined) {
-        setResult(submitted, {
-          address: submitted,
-          symbol: 'TOKEN',
-          name: 'Custom Token',
-          decryptedBalance: result.data,
-          formattedBalance: formatTokenAmount(result.data, 18),
-          decryptedAt: Date.now(),
-        });
-      }
+      await refetchBalance();
     } catch { }
   }
 
@@ -249,8 +275,13 @@ function PasteDecrypt() {
                 Refresh Balance
               </Button>
             ) : (
-              <Button className="w-full" onClick={handleGrantAndDecrypt} isLoading={granting || balanceLoading} disabled={!address}>
-                {granting ? 'Sign permit in wallet…' : 'Sign Permit & Decrypt'}
+              <Button
+                className="w-full"
+                onClick={handleGrantAndDecrypt}
+                isLoading={granting || balanceLoading}
+                disabled={!address}
+              >
+                {granting ? 'Sign in wallet…' : 'Sign Permit & Decrypt'}
               </Button>
             )}
 
@@ -264,7 +295,6 @@ function PasteDecrypt() {
   );
 }
 
-// ── Cached results ────────────────────────────────────────────
 function AllResults() {
   const results = useDecryptStore((s) => s.results);
   const entries = Object.values(results);
@@ -293,7 +323,6 @@ function AllResults() {
   );
 }
 
-// ── Main page ─────────────────────────────────────────────────
 function DecryptPageInner() {
   const { isConnected } = useAccount();
   const { chainId } = useNetwork();
@@ -328,9 +357,9 @@ function DecryptPageInner() {
         <div className="text-xs text-zinc-400 leading-relaxed space-y-1">
           <p className="font-medium text-amber-400">How it works</p>
           <p>
-            Click <strong className="text-zinc-300">Sign Permit &amp; Decrypt</strong> — your wallet will ask you to sign
-            an EIP-712 message (no gas, no transaction). This permit authorizes the Zama relayer
-            to re-encrypt your balance so only your browser can read it.
+            Click <strong className="text-zinc-300">Sign Permit & Decrypt</strong> — your wallet
+            signs an EIP-712 message (no gas). The Zama network re-encrypts your balance so only
+            your browser can read it.
           </p>
         </div>
       </div>
