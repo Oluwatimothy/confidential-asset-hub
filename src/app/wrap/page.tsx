@@ -3,7 +3,7 @@
 import React, { useState, useEffect, Suspense } from 'react';
 import { useSearchParams } from 'next/navigation';
 import { useAccount, useReadContract } from 'wagmi';
-import { CheckCircle2, AlertCircle, ArrowRight } from 'lucide-react';
+import { CheckCircle2, AlertCircle, ArrowRight, Loader2 } from 'lucide-react';
 import {
   Card, CardContent, CardHeader, CardTitle, CardDescription,
   Button, Input, Label,
@@ -54,11 +54,15 @@ function PairSelector({ pairs, selected, onSelect }: {
   );
 }
 
+type WrapStatus = 'idle' | 'approving' | 'processing' | 'success' | 'error';
+
 function WrapForm({ pair }: { pair: RegistryPair }) {
   const { address } = useAccount();
   const { chainId } = useNetwork();
   const [amount, setAmount] = useState('');
   const [amountError, setAmountError] = useState('');
+  const [status, setStatus] = useState<WrapStatus>('idle');
+  const [errorMsg, setErrorMsg] = useState('');
 
   const { data: allowance } = useUnderlyingAllowance({
     address: pair.confidentialToken.address,
@@ -76,56 +80,76 @@ function WrapForm({ pair }: { pair: RegistryPair }) {
   const approve = useApproveUnderlying(pair.confidentialToken.address);
   const shield = useShield({ address: pair.confidentialToken.address, optimistic: true });
 
-  const needsApproval =
-    allowance !== undefined &&
-    amount &&
-    parseFloat(amount) > 0 &&
-    allowance < parseUnits(amount, pair.token.decimals);
+  // Watch for success/error from mutations
+  useEffect(() => {
+    if (shield.isSuccess) setStatus('success');
+  }, [shield.isSuccess]);
 
-  async function handleAction() {
-    if (!amount || parseFloat(amount) <= 0) {
-      setAmountError('Enter an amount greater than 0');
-      return;
+  useEffect(() => {
+    if (approve.isError) {
+      setStatus('error');
+      setErrorMsg(parseContractError(approve.error));
+    }
+    if (shield.isError) {
+      setStatus('error');
+      setErrorMsg(parseContractError(shield.error));
+    }
+  }, [approve.isError, shield.isError]);
+
+  function validate(): boolean {
+    const num = parseFloat(amount);
+    if (!amount || isNaN(num)) {
+      setAmountError('Enter an amount');
+      return false;
+    }
+    if (num <= 0) {
+      setAmountError('Amount must be greater than 0');
+      return false;
+    }
+    if (tokenBalance !== undefined && parseUnits(amount, pair.token.decimals) > (tokenBalance as bigint)) {
+      setAmountError('Exceeds your balance');
+      return false;
     }
     setAmountError('');
+    return true;
+  }
+
+  async function handleAction() {
+    if (!validate()) return;
+    setErrorMsg('');
+
     const parsed = parseUnits(amount, pair.token.decimals);
-    if (needsApproval) {
-      await approve.mutateAsync({ amount: parsed });
-    } else {
+    const needsApproval = allowance !== undefined && allowance < parsed;
+
+    try {
+      if (needsApproval) {
+        setStatus('approving');
+        await approve.mutateAsync({ amount: parsed });
+      }
+      setStatus('processing');
       await shield.mutateAsync({ amount: parsed });
+    } catch (err) {
+      const msg = parseContractError(err);
+      if (!msg.includes('rejected')) {
+        setStatus('error');
+        setErrorMsg(msg);
+      } else {
+        setStatus('idle');
+      }
     }
   }
 
-  const isLoading = approve.isPending || shield.isPending;
-  const error = approve.error || shield.error;
-  const result = shield.data;
-
-  if (shield.isSuccess) {
-    return (
-      <Card>
-        <CardContent className="p-6 space-y-3">
-          <div className="rounded-xl border border-emerald-500/30 bg-emerald-500/5 p-4">
-            <div className="flex items-center gap-2 mb-2">
-              <CheckCircle2 className="h-5 w-5 text-emerald-400" />
-              <span className="text-sm font-medium text-emerald-400">Wrapped successfully</span>
-            </div>
-            {result && (
-              <p className="text-xs text-zinc-500 font-data break-all">
-                {JSON.stringify(result).slice(0, 80)}…
-              </p>
-            )}
-          </div>
-          <Button
-            variant="outline"
-            className="w-full"
-            onClick={() => { shield.reset(); approve.reset(); setAmount(''); }}
-          >
-            Wrap more
-          </Button>
-        </CardContent>
-      </Card>
-    );
+  function handleReset() {
+    setStatus('idle');
+    setErrorMsg('');
+    setAmount('');
+    shield.reset();
+    approve.reset();
   }
+
+  const formattedBalance = tokenBalance !== undefined
+    ? formatTokenAmount(tokenBalance as bigint, pair.token.decimals)
+    : '—';
 
   return (
     <Card>
@@ -134,13 +158,9 @@ function WrapForm({ pair }: { pair: RegistryPair }) {
           Wrap {pair.token.symbol} to {pair.confidentialToken.symbol}
         </CardTitle>
         <CardDescription>
-          <span className="text-zinc-400">
-            Balance:{' '}
-            <span className="text-zinc-200 font-medium">
-              {tokenBalance !== undefined
-                ? `${formatTokenAmount(tokenBalance as bigint, pair.token.decimals)} ${pair.token.symbol}`
-                : '—'}
-            </span>
+          Balance:{' '}
+          <span className="text-zinc-200 font-medium">
+            {formattedBalance} {pair.token.symbol}
           </span>
           {allowance !== undefined && allowance > 0n && (
             <span className="ml-3 text-zinc-600 text-xs">
@@ -150,77 +170,122 @@ function WrapForm({ pair }: { pair: RegistryPair }) {
         </CardDescription>
       </CardHeader>
       <CardContent className="space-y-4 pt-0">
-        <div className="space-y-1.5">
-          <Label>{pair.token.symbol} amount to wrap</Label>
-          <div className="flex gap-2">
-            <Input
-              type="number"
-              placeholder="0.00"
-              value={amount}
-              onChange={(e) => { setAmount(e.target.value); setAmountError(''); }}
-              error={amountError}
-              disabled={isLoading}
-            />
-            {tokenBalance !== undefined && (tokenBalance as bigint) > 0n && (
-              <Button
-                variant="outline"
-                size="sm"
-                onClick={() =>
-                  setAmount(
-                    formatTokenAmount(tokenBalance as bigint, pair.token.decimals).replace(/,/g, ''),
-                  )
-                }
-                disabled={isLoading}
-              >
-                Max
-              </Button>
-            )}
-          </div>
-        </div>
 
-        <div className="rounded-lg bg-zinc-800/50 p-3 text-xs space-y-1">
-          <div className="flex justify-between text-zinc-400">
-            <span>You receive</span>
-            <span className="text-amber-400">
-              {amount && parseFloat(amount) > 0
-                ? `${amount} ${pair.confidentialToken.symbol} (encrypted)`
-                : '—'}
-            </span>
-          </div>
-          <div className="flex justify-between text-zinc-400">
-            <span>Rate</span>
-            <span>{pair.rate.toString()}:1</span>
-          </div>
-        </div>
-
-        <Button
-          className="w-full"
-          onClick={handleAction}
-          disabled={!amount || isLoading}
-          isLoading={isLoading}
-        >
-          {approve.isPending
-            ? 'Approving…'
-            : shield.isPending
-              ? 'Wrapping…'
-              : needsApproval
-                ? `Approve ${pair.token.symbol}`
-                : `Wrap ${pair.token.symbol}`}
-        </Button>
-
-        {error && (
-          <div className="rounded-xl border border-red-500/30 bg-red-500/5 p-3 flex items-start gap-2">
-            <AlertCircle className="h-4 w-4 text-red-400 shrink-0 mt-0.5" />
-            <div>
-              <p className="text-xs text-red-400">{parseContractError(error)}</p>
-              <button
-                onClick={() => { shield.reset(); approve.reset(); }}
-                className="mt-1 text-xs text-amber-400 hover:underline"
-              >
-                Reset
-              </button>
+        {/* Amount input — only show when idle or error */}
+        {(status === 'idle' || status === 'error') && (
+          <div className="space-y-1.5">
+            <Label>{pair.token.symbol} amount to wrap</Label>
+            <div className="flex gap-2">
+              <Input
+                type="number"
+                min="0"
+                placeholder="0.00"
+                value={amount}
+                onChange={(e) => {
+                  const val = e.target.value;
+                  if (parseFloat(val) < 0) return;
+                  setAmount(val);
+                  setAmountError('');
+                }}
+                error={amountError}
+              />
+              {tokenBalance !== undefined && (tokenBalance as bigint) > 0n && (
+                <Button
+                  variant="outline"
+                  size="sm"
+                  onClick={() => setAmount(
+                    formatTokenAmount(tokenBalance as bigint, pair.token.decimals).replace(/,/g, '')
+                  )}
+                >
+                  Max
+                </Button>
+              )}
             </div>
           </div>
+        )}
+
+        {/* Rate info */}
+        {(status === 'idle' || status === 'error') && (
+          <div className="rounded-lg bg-zinc-800/50 p-3 text-xs space-y-1">
+            <div className="flex justify-between text-zinc-400">
+              <span>You receive</span>
+              <span className="text-amber-400">
+                {amount && parseFloat(amount) > 0
+                  ? `${amount} ${pair.confidentialToken.symbol} (encrypted)`
+                  : '—'}
+              </span>
+            </div>
+            <div className="flex justify-between text-zinc-400">
+              <span>Rate</span>
+              <span>{pair.rate.toString()}:1</span>
+            </div>
+          </div>
+        )}
+
+        {/* Processing state */}
+        {(status === 'approving' || status === 'processing') && (
+          <div className="flex items-center gap-3 rounded-xl border border-amber-400/30 bg-amber-400/5 px-4 py-3">
+            <Loader2 className="h-4 w-4 text-amber-400 animate-spin shrink-0" />
+            <div>
+              <p className="text-sm font-medium text-amber-400">
+                {status === 'approving' ? 'Approving token…' : 'Wrapping on-chain…'}
+              </p>
+              <p className="text-xs text-zinc-500 mt-0.5">
+                {status === 'approving'
+                  ? 'Confirm approval in your wallet'
+                  : 'Waiting for confirmation on Sepolia'}
+              </p>
+            </div>
+          </div>
+        )}
+
+        {/* Success state */}
+        {status === 'success' && (
+          <div className="rounded-xl border border-emerald-500/30 bg-emerald-500/5 p-4">
+            <div className="flex items-center gap-2 mb-3">
+              <CheckCircle2 className="h-5 w-5 text-emerald-400" />
+              <span className="text-sm font-medium text-emerald-400">
+                Wrapped {amount} {pair.token.symbol} successfully
+              </span>
+            </div>
+            <p className="text-xs text-zinc-500">
+              Your {pair.confidentialToken.symbol} balance is now encrypted on-chain.
+              Go to Decrypt Balance to reveal it.
+            </p>
+          </div>
+        )}
+
+        {/* Error state */}
+        {status === 'error' && errorMsg && (
+          <div className="flex items-start gap-2 rounded-xl border border-red-500/30 bg-red-500/5 p-3">
+            <AlertCircle className="h-4 w-4 text-red-400 shrink-0 mt-0.5" />
+            <p className="text-xs text-red-400">{errorMsg}</p>
+          </div>
+        )}
+
+        {/* Action buttons */}
+        {status === 'idle' && (
+          <Button className="w-full" onClick={handleAction} disabled={!amount}>
+            {allowance !== undefined && amount && parseFloat(amount) > 0 &&
+              allowance < parseUnits(amount || '0', pair.token.decimals)
+              ? `Approve ${pair.token.symbol}`
+              : `Wrap ${pair.token.symbol}`}
+          </Button>
+        )}
+        {(status === 'approving' || status === 'processing') && (
+          <Button className="w-full" disabled isLoading>
+            {status === 'approving' ? 'Approving…' : 'Wrapping…'}
+          </Button>
+        )}
+        {status === 'success' && (
+          <Button variant="outline" className="w-full" onClick={handleReset}>
+            Wrap more
+          </Button>
+        )}
+        {status === 'error' && (
+          <Button className="w-full" onClick={() => { setStatus('idle'); setErrorMsg(''); }}>
+            Try again
+          </Button>
         )}
       </CardContent>
     </Card>
