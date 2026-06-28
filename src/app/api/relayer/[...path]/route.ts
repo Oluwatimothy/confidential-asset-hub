@@ -12,7 +12,9 @@ export async function POST(
     const { path } = await params;
     const network = path[0] === 'mainnet' ? 'mainnet' : 'sepolia';
     const subPath = path.slice(1).join('/');
-    const targetUrl = `${RELAYER_URLS[network]}/${subPath}`;
+    const targetUrl = subPath
+        ? `${RELAYER_URLS[network]}/${subPath}`
+        : RELAYER_URLS[network];
 
     try {
         const body = await request.text();
@@ -38,7 +40,9 @@ export async function GET(
     const { path } = await params;
     const network = path[0] === 'mainnet' ? 'mainnet' : 'sepolia';
     const subPath = path.slice(1).join('/');
-    const targetUrl = `${RELAYER_URLS[network]}/${subPath}`;
+    const targetUrl = subPath
+        ? `${RELAYER_URLS[network]}/${subPath}`
+        : RELAYER_URLS[network];
 
     try {
         const response = await fetch(targetUrl);

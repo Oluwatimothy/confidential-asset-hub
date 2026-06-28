@@ -31,7 +31,18 @@ const rainbowTheme = darkTheme({
   overlayBlur: 'small',
 });
 
-const zamaChains = [sepolia, mainnet] as const;
+// Override relayerUrl to route through our CORS proxy
+const sepoliaWithProxy = {
+  ...sepolia,
+  relayerUrl: '/api/relayer/sepolia',
+};
+
+const mainnetWithProxy = {
+  ...mainnet,
+  relayerUrl: '/api/relayer/mainnet',
+};
+
+const zamaChains = [sepoliaWithProxy, mainnetWithProxy] as const;
 
 const zamaConfig = createZamaConfig({
   wagmiConfig,
