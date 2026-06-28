@@ -38,10 +38,20 @@ function TokenDecryptCard({ pair }: { pair: RegistryPair }) {
     isLoading: balanceLoading,
     refetch: refetchBalance,
     error: balanceError,
-  } = useConfidentialBalance(
-    { address: contractAddress, account: address },
-    { enabled: !!hasPermit && !!address },
-  );
+  }
+
+    = useConfidentialBalance(
+      { address: contractAddress, account: address },
+      { enabled: !!hasPermit && !!address },
+    );
+
+  React.useEffect(() => {
+    console.log('DEBUG', pair.confidentialToken.symbol, {
+      hasPermit,
+      decryptedBalance: decryptedBalance?.toString(),
+      balanceLoading,
+    });
+  }, [hasPermit, decryptedBalance, balanceLoading]);
 
   // Cache result when we get a real balance
   React.useEffect(() => {
