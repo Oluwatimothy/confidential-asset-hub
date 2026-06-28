@@ -32,7 +32,6 @@ const rainbowTheme = darkTheme({
   overlayBlur: 'small',
 });
 
-// Zama config — uses wagmi for signing, web() relayer for browser FHE
 const zamaConfig = createZamaConfig({
   wagmiConfig,
   chains: [sepolia, mainnet],
