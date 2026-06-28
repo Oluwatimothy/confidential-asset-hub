@@ -24,23 +24,38 @@ import type { RegistryPair } from '@/types';
 function TokenDecryptCard({ pair }: { pair: RegistryPair }) {
   const { address } = useAccount();
   const { setResult } = useDecryptStore();
-
   const contractAddress = pair.confidentialToken.address;
 
-  // Check if we already have a permit for this token
   const { data: hasPermit, refetch: recheckPermit } = useHasPermit({
     contractAddresses: [contractAddress],
   });
 
-  // Grant permit mutation — triggers EIP-712 wallet signature
-  const { mutateAsync: grantPermit, isPending: granting, error: grantError } = useGrantPermit();
+  const { mutateAsync: grantPermit, isPending: granting, error: grantError, reset: resetGrant } = useGrantPermit();
 
-  // Once permit exists, useConfidentialBalance returns the decrypted bigint directly
-  const { data: decryptedBalance, isLoading: balanceLoading, refetch: refetchBalance } =
-    useConfidentialBalance(
-      { address: contractAddress, account: address },
-      { enabled: !!hasPermit && !!address },
-    );
+  // Only runs when permit exists — returns actual decrypted bigint
+  const {
+    data: decryptedBalance,
+    isLoading: balanceLoading,
+    refetch: refetchBalance,
+    error: balanceError,
+  } = useConfidentialBalance(
+    { address: contractAddress, account: address },
+    { enabled: !!hasPermit && !!address },
+  );
+
+  // Cache result when we get a real balance
+  React.useEffect(() => {
+    if (decryptedBalance !== undefined && decryptedBalance >= 0n) {
+      setResult(contractAddress, {
+        address: contractAddress,
+        symbol: pair.confidentialToken.symbol,
+        name: pair.confidentialToken.name,
+        decryptedBalance,
+        formattedBalance: formatTokenAmount(decryptedBalance, pair.confidentialToken.decimals),
+        decryptedAt: Date.now(),
+      });
+    }
+  }, [decryptedBalance]);
 
   const cachedResult = useDecryptStore(
     (s) => s.results[contractAddress.toLowerCase()],
@@ -48,42 +63,24 @@ function TokenDecryptCard({ pair }: { pair: RegistryPair }) {
 
   async function handleGrantAndDecrypt() {
     try {
-      // Step 1: sign EIP-712 permit
+      resetGrant();
       await grantPermit([contractAddress]);
       await recheckPermit();
-      // Step 2: balance auto-fetches once permit exists (enabled flips to true)
-      const result = await refetchBalance();
-      if (result.data !== undefined) {
-        setResult(contractAddress, {
-          address: contractAddress,
-          symbol: pair.confidentialToken.symbol,
-          name: pair.confidentialToken.name,
-          decryptedBalance: result.data,
-          formattedBalance: formatTokenAmount(result.data, pair.confidentialToken.decimals),
-          decryptedAt: Date.now(),
-        });
-      }
-    } catch (err) {
-      // error shown via grantError or balanceError
+      await refetchBalance();
+    } catch {
+      // error shown via grantError
     }
   }
 
-  async function handleRefresh() {
-    const result = await refetchBalance();
-    if (result.data !== undefined) {
-      setResult(contractAddress, {
-        address: contractAddress,
-        symbol: pair.confidentialToken.symbol,
-        name: pair.confidentialToken.name,
-        decryptedBalance: result.data,
-        formattedBalance: formatTokenAmount(result.data, pair.confidentialToken.decimals),
-        decryptedAt: Date.now(),
-      });
-    }
-  }
-
+  const error = grantError || balanceError;
   const isLoading = granting || balanceLoading;
-  const error = grantError;
+
+  // What to show as the balance
+  const displayBalance = decryptedBalance !== undefined
+    ? formatTokenAmount(decryptedBalance, pair.confidentialToken.decimals)
+    : cachedResult?.formattedBalance;
+
+  const displayTime = cachedResult?.decryptedAt;
 
   return (
     <div className="rounded-xl border border-zinc-800 bg-zinc-900 p-4 space-y-3">
@@ -98,48 +95,39 @@ function TokenDecryptCard({ pair }: { pair: RegistryPair }) {
           </div>
         </div>
 
-        {/* Show decrypted balance if available */}
-        {decryptedBalance !== undefined ? (
+        {/* Balance display */}
+        {displayBalance !== undefined ? (
           <div className="text-right shrink-0">
-            <p className="font-data text-lg font-bold text-emerald-400">
-              {formatTokenAmount(decryptedBalance, pair.confidentialToken.decimals)}
-            </p>
+            <p className="font-data text-xl font-bold text-emerald-400">{displayBalance}</p>
             <p className="text-[10px] text-zinc-500">{pair.confidentialToken.symbol}</p>
+            {displayTime && <p className="text-[10px] text-zinc-600">{timeAgo(displayTime)}</p>}
           </div>
-        ) : cachedResult ? (
+        ) : (
           <div className="text-right shrink-0">
-            <p className="font-data text-lg font-bold text-emerald-400/70">
-              {cachedResult.formattedBalance}
-            </p>
-            <p className="text-[10px] text-zinc-600">{timeAgo(cachedResult.decryptedAt)}</p>
+            <p className="text-xs text-zinc-600">Sign permit to reveal</p>
           </div>
-        ) : null}
+        )}
       </div>
 
-      {/* Permit status */}
-      {hasPermit ? (
+      {/* Action area */}
+      {!hasPermit ? (
+        <div className="space-y-2">
+          <div className="flex items-center gap-1.5 text-xs text-zinc-500">
+            <KeyRound className="h-3.5 w-3.5" />
+            <span>One-time EIP-712 signature required — no gas, free</span>
+          </div>
+          <Button className="w-full" onClick={handleGrantAndDecrypt} isLoading={isLoading} disabled={!address || isLoading}>
+            {granting ? 'Sign in wallet…' : balanceLoading ? 'Decrypting…' : 'Sign Permit & Decrypt'}
+          </Button>
+        </div>
+      ) : (
         <div className="flex items-center justify-between">
           <div className="flex items-center gap-1.5 text-xs text-emerald-400/70">
             <CheckCircle2 className="h-3.5 w-3.5" />
             <span>Permit active</span>
           </div>
-          <Button size="sm" variant="outline" onClick={handleRefresh} isLoading={balanceLoading}>
-            Refresh Balance
-          </Button>
-        </div>
-      ) : (
-        <div className="space-y-2">
-          <div className="flex items-center gap-1.5 text-xs text-zinc-500">
-            <KeyRound className="h-3.5 w-3.5" />
-            <span>Sign a permit to decrypt this token</span>
-          </div>
-          <Button
-            className="w-full"
-            onClick={handleGrantAndDecrypt}
-            isLoading={isLoading}
-            disabled={!address || isLoading}
-          >
-            {granting ? 'Sign permit in wallet…' : balanceLoading ? 'Decrypting…' : 'Sign Permit & Decrypt'}
+          <Button size="sm" variant="outline" onClick={() => refetchBalance()} isLoading={balanceLoading}>
+            Refresh
           </Button>
         </div>
       )}
