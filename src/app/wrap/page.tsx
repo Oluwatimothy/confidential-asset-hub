@@ -3,7 +3,7 @@
 import React, { useState, useEffect, Suspense } from 'react';
 import { useSearchParams } from 'next/navigation';
 import { useAccount, useReadContract } from 'wagmi';
-import { CheckCircle2, AlertCircle, ArrowRight, Loader2 } from 'lucide-react';
+import { CheckCircle2, AlertCircle, ArrowRight, Info, Loader2, ExternalLink } from 'lucide-react';
 import {
   Card, CardContent, CardHeader, CardTitle, CardDescription,
   Button, Input, Label,
@@ -11,12 +11,14 @@ import {
 import { useShield, useApproveUnderlying, useUnderlyingAllowance } from '@zama-fhe/react-sdk';
 import { useRegistry } from '@/hooks/use-registry';
 import { useNetwork } from '@/hooks/use-network';
-import { formatTokenAmount, parseContractError } from '@/utils';
+import { formatTokenAmount, parseContractError, getTxUrl } from '@/utils';
 import { ERC20_ABI } from '@/contracts/erc20-abi';
 import { ConnectButton } from '@rainbow-me/rainbowkit';
-import { parseUnits } from 'viem';
+import { parseUnits, formatUnits } from 'viem';
 import type { RegistryPair } from '@/types';
 import type { Address } from 'viem';
+
+type WrapStatus = 'idle' | 'approving' | 'approved' | 'wrapping' | 'success' | 'error';
 
 function PairSelector({ pairs, selected, onSelect }: {
   pairs: RegistryPair[];
@@ -30,8 +32,8 @@ function PairSelector({ pairs, selected, onSelect }: {
           key={i}
           onClick={() => onSelect(pair)}
           className={`flex items-center gap-3 rounded-xl border p-3 text-left transition-all ${selected?.token.address === pair.token.address
-              ? 'border-amber-400/50 bg-amber-400/5'
-              : 'border-zinc-800 hover:border-zinc-700 hover:bg-zinc-900'
+            ? 'border-amber-400/50 bg-amber-400/5'
+            : 'border-zinc-800 hover:border-zinc-700 hover:bg-zinc-900'
             }`}
         >
           <div className="flex h-8 w-8 items-center justify-center rounded-full bg-zinc-800 text-xs font-bold text-zinc-300 shrink-0">
@@ -54,17 +56,17 @@ function PairSelector({ pairs, selected, onSelect }: {
   );
 }
 
-type WrapStatus = 'idle' | 'approving' | 'processing' | 'success' | 'error';
-
-function WrapForm({ pair }: { pair: RegistryPair }) {
+function WrapForm({ pair, onReset }: { pair: RegistryPair; onReset: () => void }) {
   const { address } = useAccount();
   const { chainId } = useNetwork();
   const [amount, setAmount] = useState('');
   const [amountError, setAmountError] = useState('');
   const [status, setStatus] = useState<WrapStatus>('idle');
   const [errorMsg, setErrorMsg] = useState('');
+  const [approveTxHash, setApproveTxHash] = useState<string | undefined>();
+  const [wrapTxHash, setWrapTxHash] = useState<string | undefined>();
 
-  const { data: allowance } = useUnderlyingAllowance({
+  const { data: allowance, refetch: refetchAllowance } = useUnderlyingAllowance({
     address: pair.confidentialToken.address,
     owner: address,
   });
@@ -80,33 +82,25 @@ function WrapForm({ pair }: { pair: RegistryPair }) {
   const approve = useApproveUnderlying(pair.confidentialToken.address);
   const shield = useShield({ address: pair.confidentialToken.address, optimistic: true });
 
-  // Watch for success/error from mutations
-  useEffect(() => {
-    if (shield.isSuccess) setStatus('success');
-  }, [shield.isSuccess]);
-
-  useEffect(() => {
-    if (approve.isError) {
-      setStatus('error');
-      setErrorMsg(parseContractError(approve.error));
+  // Human readable rate
+  const rateDisplay = (() => {
+    if (pair.rate <= 1n) return '1:1';
+    // rate = underlying units per confidential unit
+    // e.g. 1_000_000_000_000 means 1 cToken = 10^12 underlying units
+    // which for 18 decimal token = 1 underlying token per 1 cToken
+    const decimalDiff = pair.token.decimals - pair.confidentialToken.decimals;
+    if (decimalDiff > 0) {
+      return `1:1 (rate adjusted for decimals)`;
     }
-    if (shield.isError) {
-      setStatus('error');
-      setErrorMsg(parseContractError(shield.error));
-    }
-  }, [approve.isError, shield.isError]);
+    return `${pair.rate.toString()}:1`;
+  })();
 
   function validate(): boolean {
     const num = parseFloat(amount);
-    if (!amount || isNaN(num)) {
-      setAmountError('Enter an amount');
-      return false;
-    }
-    if (num <= 0) {
-      setAmountError('Amount must be greater than 0');
-      return false;
-    }
-    if (tokenBalance !== undefined && parseUnits(amount, pair.token.decimals) > (tokenBalance as bigint)) {
+    if (!amount || isNaN(num)) { setAmountError('Enter an amount'); return false; }
+    if (num <= 0) { setAmountError('Amount must be greater than 0'); return false; }
+    if (tokenBalance !== undefined &&
+      parseUnits(amount, pair.token.decimals) > (tokenBalance as bigint)) {
       setAmountError('Exceeds your balance');
       return false;
     }
@@ -114,27 +108,54 @@ function WrapForm({ pair }: { pair: RegistryPair }) {
     return true;
   }
 
-  async function handleAction() {
+  const needsApproval = (() => {
+    if (!amount || parseFloat(amount) <= 0 || allowance === undefined) return false;
+    try {
+      return allowance < parseUnits(amount, pair.token.decimals);
+    } catch {
+      return false;
+    }
+  })();
+
+  async function handleApprove() {
     if (!validate()) return;
     setErrorMsg('');
-
-    const parsed = parseUnits(amount, pair.token.decimals);
-    const needsApproval = allowance !== undefined && allowance < parsed;
-
+    setStatus('approving');
     try {
-      if (needsApproval) {
-        setStatus('approving');
-        await approve.mutateAsync({ amount: parsed });
-      }
-      setStatus('processing');
-      await shield.mutateAsync({ amount: parsed });
+      const result = await approve.mutateAsync({
+        amount: parseUnits(amount, pair.token.decimals),
+      });
+      setApproveTxHash((result as { txHash?: string })?.txHash);
+      await refetchAllowance();
+      setStatus('approved');
     } catch (err) {
       const msg = parseContractError(err);
-      if (!msg.includes('rejected')) {
+      if (msg.includes('rejected')) {
+        setStatus('idle');
+      } else {
         setStatus('error');
         setErrorMsg(msg);
+      }
+    }
+  }
+
+  async function handleWrap() {
+    if (!validate()) return;
+    setErrorMsg('');
+    setStatus('wrapping');
+    try {
+      const result = await shield.mutateAsync({
+        amount: parseUnits(amount, pair.token.decimals),
+      });
+      setWrapTxHash(result.txHash);
+      setStatus('success');
+    } catch (err) {
+      const msg = parseContractError(err);
+      if (msg.includes('rejected')) {
+        setStatus(needsApproval ? 'idle' : 'approved');
       } else {
-        setStatus('idle');
+        setStatus('error');
+        setErrorMsg(msg);
       }
     }
   }
@@ -143,13 +164,30 @@ function WrapForm({ pair }: { pair: RegistryPair }) {
     setStatus('idle');
     setErrorMsg('');
     setAmount('');
-    shield.reset();
+    setApproveTxHash(undefined);
+    setWrapTxHash(undefined);
     approve.reset();
+    shield.reset();
+    onReset();
   }
 
   const formattedBalance = tokenBalance !== undefined
     ? formatTokenAmount(tokenBalance as bigint, pair.token.decimals)
     : '—';
+
+  // What you receive — account for rate
+  const receiveAmount = (() => {
+    if (!amount || parseFloat(amount) <= 0) return '—';
+    if (pair.rate <= 1n) return `${amount} ${pair.confidentialToken.symbol}`;
+    try {
+      const rawIn = parseUnits(amount, pair.token.decimals);
+      const rawOut = rawIn / pair.rate;
+      const formatted = formatUnits(rawOut, pair.confidentialToken.decimals);
+      return `${parseFloat(formatted).toFixed(6)} ${pair.confidentialToken.symbol}`;
+    } catch {
+      return `${amount} ${pair.confidentialToken.symbol}`;
+    }
+  })();
 
   return (
     <Card>
@@ -171,7 +209,7 @@ function WrapForm({ pair }: { pair: RegistryPair }) {
       </CardHeader>
       <CardContent className="space-y-4 pt-0">
 
-        {/* Amount input — only show when idle or error */}
+        {/* Amount input */}
         {(status === 'idle' || status === 'error') && (
           <div className="space-y-1.5">
             <Label>{pair.token.symbol} amount to wrap</Label>
@@ -205,57 +243,90 @@ function WrapForm({ pair }: { pair: RegistryPair }) {
         )}
 
         {/* Rate info */}
-        {(status === 'idle' || status === 'error') && (
+        {(status === 'idle' || status === 'error') && amount && parseFloat(amount) > 0 && (
           <div className="rounded-lg bg-zinc-800/50 p-3 text-xs space-y-1">
             <div className="flex justify-between text-zinc-400">
               <span>You receive</span>
-              <span className="text-amber-400">
-                {amount && parseFloat(amount) > 0
-                  ? `${amount} ${pair.confidentialToken.symbol} (encrypted)`
-                  : '—'}
-              </span>
+              <span className="text-amber-400">{receiveAmount} (encrypted)</span>
             </div>
             <div className="flex justify-between text-zinc-400">
-              <span>Rate</span>
-              <span>{pair.rate.toString()}:1</span>
+              <span>Steps needed</span>
+              <span>{needsApproval ? '2 (approve + wrap)' : '1 (wrap only)'}</span>
             </div>
           </div>
         )}
 
-        {/* Processing state */}
-        {(status === 'approving' || status === 'processing') && (
-          <div className="flex items-center gap-3 rounded-xl border border-amber-400/30 bg-amber-400/5 px-4 py-3">
-            <Loader2 className="h-4 w-4 text-amber-400 animate-spin shrink-0" />
-            <div>
-              <p className="text-sm font-medium text-amber-400">
-                {status === 'approving' ? 'Approving token…' : 'Wrapping on-chain…'}
-              </p>
-              <p className="text-xs text-zinc-500 mt-0.5">
+        {/* Step progress */}
+        {status !== 'idle' && status !== 'error' && (
+          <div className="space-y-2">
+            {/* Step 1 — Approve (only if needed) */}
+            {(approveTxHash || status === 'approving') && (
+              <div className={`flex items-center gap-3 rounded-lg p-3 ${status === 'approving'
+                ? 'border border-amber-400/30 bg-amber-400/5'
+                : 'border border-emerald-500/20 bg-emerald-500/5'
+                }`}>
                 {status === 'approving'
-                  ? 'Confirm approval in your wallet'
-                  : 'Waiting for confirmation on Sepolia'}
-              </p>
-            </div>
+                  ? <Loader2 className="h-4 w-4 text-amber-400 animate-spin shrink-0" />
+                  : <CheckCircle2 className="h-4 w-4 text-emerald-400 shrink-0" />
+                }
+                <div className="min-w-0 flex-1">
+                  <p className={`text-sm font-medium ${status === 'approving' ? 'text-amber-400' : 'text-emerald-400'}`}>
+                    {status === 'approving' ? 'Step 1: Approving…' : 'Step 1: Approved'}
+                  </p>
+                  {approveTxHash && (
+                    <a href={getTxUrl(approveTxHash, chainId)} target="_blank" rel="noopener noreferrer" className="text-xs text-zinc-500 hover:text-amber-400 flex items-center gap-1 mt-0.5">
+                      View on Etherscan <ExternalLink className="h-3 w-3" />
+                    </a>
+                  )}
+                </div>
+              </div>
+            )}
+
+            {/* Wrap step */}
+            {(status === 'approved' || status === 'wrapping' || status === 'success') && (
+              <div className={`flex items-center gap-3 rounded-lg p-3 ${status === 'wrapping'
+                ? 'border border-amber-400/30 bg-amber-400/5'
+                : status === 'success'
+                  ? 'border border-emerald-500/20 bg-emerald-500/5'
+                  : 'border border-zinc-700 bg-zinc-900'
+                }`}>
+                {status === 'wrapping'
+                  ? <Loader2 className="h-4 w-4 text-amber-400 animate-spin shrink-0" />
+                  : status === 'success'
+                    ? <CheckCircle2 className="h-4 w-4 text-emerald-400 shrink-0" />
+                    : <div className="h-4 w-4 rounded-full border border-zinc-600 shrink-0" />
+                }
+                <div className="min-w-0 flex-1">
+                  <p className={`text-sm font-medium ${status === 'wrapping' ? 'text-amber-400' :
+                    status === 'success' ? 'text-emerald-400' :
+                      'text-zinc-400'
+                    }`}>
+                    {status === 'wrapping'
+                      ? `${approveTxHash ? 'Step 2' : 'Step 1'}: Wrapping on-chain…`
+                      : status === 'success'
+                        ? `Wrapped ${amount} ${pair.token.symbol} successfully`
+                        : `${approveTxHash ? 'Step 2' : 'Step 1'}: Ready to wrap`}
+                  </p>
+                  {wrapTxHash && (
+                    <a href={getTxUrl(wrapTxHash, chainId)} target="_blank" rel="noopener noreferrer" className="text-xs text-zinc-500 hover:text-amber-400 flex items-center gap-1 mt-0.5">
+                      View on Etherscan <ExternalLink className="h-3 w-3" />
+                    </a>
+                  )}
+                </div>
+              </div>
+            )}
+
+            {/* Wrapping only (no approve needed) */}
+            {status === 'wrapping' && !approveTxHash && (
+              <div className="flex items-center gap-3 rounded-lg p-3 border border-amber-400/30 bg-amber-400/5">
+                <Loader2 className="h-4 w-4 text-amber-400 animate-spin shrink-0" />
+                <p className="text-sm font-medium text-amber-400">Wrapping on-chain…</p>
+              </div>
+            )}
           </div>
         )}
 
-        {/* Success state */}
-        {status === 'success' && (
-          <div className="rounded-xl border border-emerald-500/30 bg-emerald-500/5 p-4">
-            <div className="flex items-center gap-2 mb-3">
-              <CheckCircle2 className="h-5 w-5 text-emerald-400" />
-              <span className="text-sm font-medium text-emerald-400">
-                Wrapped {amount} {pair.token.symbol} successfully
-              </span>
-            </div>
-            <p className="text-xs text-zinc-500">
-              Your {pair.confidentialToken.symbol} balance is now encrypted on-chain.
-              Go to Decrypt Balance to reveal it.
-            </p>
-          </div>
-        )}
-
-        {/* Error state */}
+        {/* Error */}
         {status === 'error' && errorMsg && (
           <div className="flex items-start gap-2 rounded-xl border border-red-500/30 bg-red-500/5 p-3">
             <AlertCircle className="h-4 w-4 text-red-400 shrink-0 mt-0.5" />
@@ -263,19 +334,22 @@ function WrapForm({ pair }: { pair: RegistryPair }) {
           </div>
         )}
 
-        {/* Action buttons */}
+        {/* Buttons */}
         {status === 'idle' && (
-          <Button className="w-full" onClick={handleAction} disabled={!amount}>
-            {allowance !== undefined && amount && parseFloat(amount) > 0 &&
-              allowance < parseUnits(amount || '0', pair.token.decimals)
-              ? `Approve ${pair.token.symbol}`
-              : `Wrap ${pair.token.symbol}`}
+          <Button className="w-full" onClick={needsApproval ? handleApprove : handleWrap} disabled={!amount}>
+            {needsApproval ? `Approve ${pair.token.symbol}` : `Wrap ${pair.token.symbol}`}
           </Button>
         )}
-        {(status === 'approving' || status === 'processing') && (
-          <Button className="w-full" disabled isLoading>
-            {status === 'approving' ? 'Approving…' : 'Wrapping…'}
+        {status === 'approving' && (
+          <Button className="w-full" disabled isLoading>Approving…</Button>
+        )}
+        {status === 'approved' && (
+          <Button className="w-full" onClick={handleWrap}>
+            Wrap {pair.token.symbol}
           </Button>
+        )}
+        {status === 'wrapping' && (
+          <Button className="w-full" disabled isLoading>Wrapping…</Button>
         )}
         {status === 'success' && (
           <Button variant="outline" className="w-full" onClick={handleReset}>
@@ -303,6 +377,7 @@ function WrapPageInner() {
     (p) => p.isValid && Number(p.chainId) === Number(chainId),
   );
   const [selectedPair, setSelectedPair] = useState<RegistryPair | null>(null);
+  const [formKey, setFormKey] = useState(0);
 
   useEffect(() => {
     if (presetToken && validPairs.length > 0 && !selectedPair) {
@@ -312,6 +387,11 @@ function WrapPageInner() {
       if (found) setSelectedPair(found);
     }
   }, [presetToken, validPairs.length]);
+
+  function handleSelectPair(p: RegistryPair) {
+    setSelectedPair(p);
+    setFormKey((k) => k + 1); // force WrapForm to remount = reset all state
+  }
 
   if (!isConnected) {
     return (
@@ -338,20 +418,20 @@ function WrapPageInner() {
         </CardHeader>
         <CardContent className="pt-0">
           {validPairs.length === 0 ? (
-            <p className="text-sm text-zinc-500 text-center py-4">
-              No valid pairs found. Make sure you are on Sepolia.
-            </p>
+            <p className="text-sm text-zinc-500 text-center py-4">No valid pairs found. Make sure you are on Sepolia.</p>
           ) : (
-            <PairSelector
-              pairs={validPairs}
-              selected={selectedPair}
-              onSelect={(p) => setSelectedPair(p)}
-            />
+            <PairSelector pairs={validPairs} selected={selectedPair} onSelect={handleSelectPair} />
           )}
         </CardContent>
       </Card>
 
-      {selectedPair && <WrapForm pair={selectedPair} />}
+      {selectedPair && (
+        <WrapForm
+          key={formKey}
+          pair={selectedPair}
+          onReset={() => setFormKey((k) => k + 1)}
+        />
+      )}
     </div>
   );
 }
