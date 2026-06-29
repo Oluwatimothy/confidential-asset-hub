@@ -231,8 +231,8 @@ function UnwrapForm({ pair }: { pair: RegistryPair }) {
           <div className="space-y-2">
             {/* Step 1 */}
             <div className={`flex items-center gap-3 rounded-lg p-3 ${status === 'unwrapping'
-                ? 'border border-amber-400/30 bg-amber-400/5'
-                : 'border border-emerald-500/20 bg-emerald-500/5'
+              ? 'border border-amber-400/30 bg-amber-400/5'
+              : 'border border-emerald-500/20 bg-emerald-500/5'
               }`}>
               {status === 'unwrapping'
                 ? <Loader2 className="h-4 w-4 text-amber-400 animate-spin shrink-0" />
@@ -253,10 +253,10 @@ function UnwrapForm({ pair }: { pair: RegistryPair }) {
             {/* Step 2 */}
             {(status === 'awaiting-finalize' || status === 'finalizing' || status === 'success') && (
               <div className={`flex items-center gap-3 rounded-lg p-3 ${status === 'finalizing'
-                  ? 'border border-amber-400/30 bg-amber-400/5'
-                  : status === 'success'
-                    ? 'border border-emerald-500/20 bg-emerald-500/5'
-                    : 'border border-zinc-700 bg-zinc-900'
+                ? 'border border-amber-400/30 bg-amber-400/5'
+                : status === 'success'
+                  ? 'border border-emerald-500/20 bg-emerald-500/5'
+                  : 'border border-zinc-700 bg-zinc-900'
                 }`}>
                 {status === 'finalizing'
                   ? <Loader2 className="h-4 w-4 text-amber-400 animate-spin shrink-0" />
@@ -266,8 +266,8 @@ function UnwrapForm({ pair }: { pair: RegistryPair }) {
                 }
                 <div className="min-w-0 flex-1">
                   <p className={`text-sm font-medium ${status === 'finalizing' ? 'text-amber-400' :
-                      status === 'success' ? 'text-emerald-400' :
-                        'text-zinc-400'
+                    status === 'success' ? 'text-emerald-400' :
+                      'text-zinc-400'
                     }`}>
                     {status === 'finalizing'
                       ? 'Step 2: Finalizing unwrap…'
@@ -350,6 +350,7 @@ function UnwrapPageInner() {
     (p) => p.isValid && Number(p.chainId) === Number(chainId),
   );
   const [selectedPair, setSelectedPair] = useState<RegistryPair | null>(null);
+  const [formKey, setFormKey] = useState(0);
 
   useEffect(() => {
     if (presetToken && validPairs.length > 0 && !selectedPair) {
@@ -399,10 +400,10 @@ function UnwrapPageInner() {
             validPairs.map((pair, i) => (
               <button
                 key={i}
-                onClick={() => setSelectedPair(pair)}
+                onClick={() => { setSelectedPair(pair); setFormKey((k) => k + 1); }}
                 className={`w-full flex items-center gap-3 rounded-xl border p-3 text-left transition-all ${selectedPair?.confidentialToken.address === pair.confidentialToken.address
-                    ? 'border-amber-400/50 bg-amber-400/5'
-                    : 'border-zinc-800 hover:border-zinc-700 hover:bg-zinc-900'
+                  ? 'border-amber-400/50 bg-amber-400/5'
+                  : 'border-zinc-800 hover:border-zinc-700 hover:bg-zinc-900'
                   }`}
               >
                 <div className="flex h-8 w-8 items-center justify-center rounded-full bg-amber-400/10 text-xs font-bold text-amber-400 shrink-0">c</div>
@@ -420,7 +421,7 @@ function UnwrapPageInner() {
         </CardContent>
       </Card>
 
-      {selectedPair && <UnwrapForm pair={selectedPair} />}
+      {selectedPair && <UnwrapForm key={formKey} pair={selectedPair} />}
     </div>
   );
 }
