@@ -11,7 +11,7 @@
 
 ## Overview
 
-Confidential Asset Hub is a **production-grade, open-source frontend** for the Zama Wrappers Registry ecosystem. It serves as a unified interface for interacting with ERC7984 confidential tokens — wrapping, unwrapping, decrypting, and exploring the official on-chain registry.
+Confidential Asset Hub is a **production-grade, open-source frontend** for the Zama Wrappers Registry ecosystem. It serves as a unified interface for interacting with ERC7984 confidential tokens; wrapping, unwrapping, decrypting, and exploring the official on-chain registry.
 
 Built to a standard comparable to Vercel Dashboard, Alchemy, and Stripe — not a hackathon prototype.
 
@@ -45,7 +45,7 @@ A full-stack Next.js 15 application that integrates:
 - **On-chain Registry** (`ConfidentialTokenWrappersRegistry`) read via viem
 - **Hybrid Registry** — official on-chain pairs merged with local custom pairs
 - **wagmi + RainbowKit** for type-safe Ethereum interaction
-- **Yellow / Black / White / Grey** design system — distinctive, professional, zero AI-purple
+
 
 ---
 
