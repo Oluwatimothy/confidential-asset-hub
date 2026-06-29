@@ -55,9 +55,7 @@ function TokenDecryptCard({ pair }: { pair: RegistryPair }) {
 
   // Only treat it as a real balance if it's a sane number
   const decryptedBalance = isRealBalance(rawBalance) ? rawBalance : undefined;
-  if (rawBalance !== undefined) {
-    console.log(`[${pair.confidentialToken.symbol}] rawBalance:`, rawBalance.toString(), 'decimals:', pair.confidentialToken.decimals);
-  }
+
 
   // Cache whenever we get a real balance
   React.useEffect(() => {

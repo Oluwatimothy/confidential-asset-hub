@@ -1,7 +1,7 @@
 // ============================================================
 // config/custom-pairs.ts
-// Hardcoded Sepolia pairs sourced from official Zama docs as fallback.
-// These are merged with the live on-chain registry.
+// Sepolia pairs — verified decimals from on-chain contract reads
+// All confidential wrappers use 6 decimals regardless of underlying
 // ============================================================
 
 import type { RegistryPair, SupportedChainId } from '@/types';
@@ -13,8 +13,6 @@ export interface CustomPairEntry
   rate: bigint;
 }
 
-// Official Sepolia testnet pairs — from docs.zama.org/protocol/protocol-apps/addresses/testnet/sepolia
-// These are seeded as 'custom' source and will be overridden if the on-chain registry also returns them
 export const CUSTOM_PAIRS: CustomPairEntry[] = [
   {
     token: {
@@ -31,7 +29,7 @@ export const CUSTOM_PAIRS: CustomPairEntry[] = [
     },
     rate: 1n,
     chainId: CHAIN_IDS.SEPOLIA,
-    notes: 'Official Sepolia testnet mock — public mint up to 1M',
+    notes: 'Official Sepolia testnet mock',
     addedAt: 1719360000000,
   },
   {
@@ -49,7 +47,7 @@ export const CUSTOM_PAIRS: CustomPairEntry[] = [
     },
     rate: 1n,
     chainId: CHAIN_IDS.SEPOLIA,
-    notes: 'Official Sepolia testnet mock — public mint up to 1M',
+    notes: 'Official Sepolia testnet mock',
     addedAt: 1719360000000,
   },
   {
@@ -63,11 +61,11 @@ export const CUSTOM_PAIRS: CustomPairEntry[] = [
       address: '0x46208622DA27d91db4f0393733C8BA082ed83158',
       name: 'Confidential WETH (Mock)',
       symbol: 'cWETHMock',
-      decimals: 18,
+      decimals: 6,
     },
-    rate: 1n,
+    rate: 1_000_000_000_000n,
     chainId: CHAIN_IDS.SEPOLIA,
-    notes: 'Official Sepolia testnet mock — public mint up to 1M',
+    notes: 'Official Sepolia testnet mock',
     addedAt: 1719360000000,
   },
   {
@@ -81,11 +79,11 @@ export const CUSTOM_PAIRS: CustomPairEntry[] = [
       address: '0xaa5612FA27c927a0c7961f5AEFEE5ba3A0F9C891',
       name: 'Confidential BRON (Mock)',
       symbol: 'cBRONMock',
-      decimals: 18,
+      decimals: 6,
     },
-    rate: 1n,
+    rate: 1_000_000_000_000n,
     chainId: CHAIN_IDS.SEPOLIA,
-    notes: 'Official Sepolia testnet mock — public mint up to 1M',
+    notes: 'Official Sepolia testnet mock',
     addedAt: 1719360000000,
   },
   {
@@ -99,11 +97,11 @@ export const CUSTOM_PAIRS: CustomPairEntry[] = [
       address: '0xf2D628d2598aF4eAF94CB76a437Ff86CA78FfbFB',
       name: 'Confidential ZAMA (Mock)',
       symbol: 'cZAMAMock',
-      decimals: 18,
+      decimals: 6,
     },
-    rate: 1n,
+    rate: 1_000_000_000_000n,
     chainId: CHAIN_IDS.SEPOLIA,
-    notes: 'Official Sepolia testnet mock — public mint up to 1M',
+    notes: 'Official Sepolia testnet mock',
     addedAt: 1719360000000,
   },
   {
@@ -117,11 +115,11 @@ export const CUSTOM_PAIRS: CustomPairEntry[] = [
       address: '0xfCE5c7069c5525eF6c8C2b2E35A745bA20a2F7CC',
       name: 'Confidential tGBP (Mock)',
       symbol: 'ctGBPMock',
-      decimals: 18,
+      decimals: 6,
     },
-    rate: 1n,
+    rate: 1_000_000_000_000n,
     chainId: CHAIN_IDS.SEPOLIA,
-    notes: 'Official Sepolia testnet mock — public mint up to 1M',
+    notes: 'Official Sepolia testnet mock',
     addedAt: 1719360000000,
   },
   {
@@ -139,7 +137,7 @@ export const CUSTOM_PAIRS: CustomPairEntry[] = [
     },
     rate: 1n,
     chainId: CHAIN_IDS.SEPOLIA,
-    notes: 'Official Sepolia testnet mock — public mint up to 1M',
+    notes: 'Official Sepolia testnet mock',
     addedAt: 1719360000000,
   },
   {
@@ -153,9 +151,9 @@ export const CUSTOM_PAIRS: CustomPairEntry[] = [
       address: '0x167DC962808B32CFFFc7e14B5018c0bE06A3A208',
       name: 'Confidential tGBP',
       symbol: 'ctGBP',
-      decimals: 18,
+      decimals: 6,
     },
-    rate: 1n,
+    rate: 1_000_000_000_000n,
     chainId: CHAIN_IDS.SEPOLIA,
     notes: 'Official Sepolia testnet — restricted mint',
     addedAt: 1719360000000,
