@@ -8,7 +8,7 @@ import {
   Card, CardContent, CardHeader, CardTitle, CardDescription,
   Button, Input, Label, Badge,
 } from '@/components/ui';
-import { useFaucetStore } from '@/stores';
+import { useFaucetStore, useTxStore } from '@/stores';
 import { useNetwork } from '@/hooks/use-network';
 import { getFaucetTokensByChain } from '@/config/faucet-tokens';
 import { getTxUrl, formatDate, parseContractError } from '@/utils';
@@ -35,6 +35,7 @@ function FaucetCard({ token }: { token: FaucetToken }) {
   const { address, isConnected } = useAccount();
   const { chainId } = useNetwork();
   const { addClaim } = useFaucetStore();
+  const { addTx, updateTx } = useTxStore();
 
   const [status, setStatus] = useState<ClaimStatus>('idle');
   const [txHash, setTxHash] = useState<string | undefined>();
@@ -63,6 +64,7 @@ function FaucetCard({ token }: { token: FaucetToken }) {
           claimedAt: Date.now(),
           amount: parseUnits(amount, token.decimals),
         });
+        updateTx(txHash, { status: 'confirmed' });
       }
     }
     if (txError) {
@@ -92,6 +94,15 @@ function FaucetCard({ token }: { token: FaucetToken }) {
         args: [address, parseUnits(amount, token.decimals)],
       });
       setTxHash(hash);
+      addTx({
+        hash,
+        type: 'faucet',
+        status: 'pending',
+        timestamp: Date.now(),
+        tokenSymbol: token.symbol,
+        amount,
+        chainId,
+      });
     } catch (err) {
       const msg = parseContractError(err);
       if (msg.includes('rejected')) {

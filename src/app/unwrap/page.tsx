@@ -15,6 +15,7 @@ import {
   useGrantPermit,
   useHasPermit,
 } from '@zama-fhe/react-sdk';
+import { useTxStore } from '@/stores';
 import { findUnwrapRequested } from '@zama-fhe/sdk';
 import { useRegistry } from '@/hooks/use-registry';
 import { useNetwork } from '@/hooks/use-network';
@@ -65,6 +66,7 @@ function UnwrapForm({ pair }: { pair: RegistryPair }) {
 
   // Step 2 — finalize
   const finalizeUnwrap = useFinalizeUnwrap(pair.confidentialToken.address);
+  const { addTx } = useTxStore();
 
   async function handleDecryptBalance() {
     try {
@@ -130,6 +132,15 @@ function UnwrapForm({ pair }: { pair: RegistryPair }) {
         unwrapRequestId,
       });
       setFinalizeTxHash(result.txHash);
+      addTx({
+        hash: result.txHash,
+        type: 'unwrap',
+        status: 'confirmed',
+        timestamp: Date.now(),
+        tokenSymbol: pair.confidentialToken.symbol,
+        amount,
+        chainId,
+      });
       setStatus('success');
     } catch (err) {
       const msg = parseContractError(err);

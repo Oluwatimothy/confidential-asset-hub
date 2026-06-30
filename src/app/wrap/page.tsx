@@ -9,6 +9,7 @@ import {
   Button, Input, Label,
 } from '@/components/ui';
 import { useShield, useApproveUnderlying, useUnderlyingAllowance } from '@zama-fhe/react-sdk';
+import { useTxStore } from '@/stores';
 import { useRegistry } from '@/hooks/use-registry';
 import { useNetwork } from '@/hooks/use-network';
 import { formatTokenAmount, parseContractError, getTxUrl } from '@/utils';
@@ -81,6 +82,7 @@ function WrapForm({ pair, onReset }: { pair: RegistryPair; onReset: () => void }
 
   const approve = useApproveUnderlying(pair.confidentialToken.address);
   const shield = useShield({ address: pair.confidentialToken.address, optimistic: true });
+  const { addTx } = useTxStore();
 
   // Human readable rate
   const rateDisplay = (() => {
@@ -148,6 +150,15 @@ function WrapForm({ pair, onReset }: { pair: RegistryPair; onReset: () => void }
         amount: parseUnits(amount, pair.token.decimals),
       });
       setWrapTxHash(result.txHash);
+      addTx({
+        hash: result.txHash,
+        type: 'wrap',
+        status: 'confirmed',
+        timestamp: Date.now(),
+        tokenSymbol: pair.token.symbol,
+        amount,
+        chainId,
+      });
       setStatus('success');
     } catch (err) {
       const msg = parseContractError(err);
