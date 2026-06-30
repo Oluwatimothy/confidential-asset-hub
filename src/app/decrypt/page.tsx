@@ -2,6 +2,7 @@
 
 import React, { useState, Suspense } from 'react';
 import { useAccount } from 'wagmi';
+import { useReadContract } from 'wagmi';
 import { Lock, Info, CheckCircle2, AlertCircle, KeyRound } from 'lucide-react';
 import {
   Card, CardContent, CardHeader, CardTitle, CardDescription,
@@ -59,7 +60,7 @@ function TokenDecryptCard({ pair }: { pair: RegistryPair }) {
 
   // Cache whenever we get a real balance
   React.useEffect(() => {
-    if (decryptedBalance !== undefined) {
+    if (decryptedBalance !== undefined && decryptedBalance > 0n) {
       setResult(contractAddress, {
         address: contractAddress,
         symbol: pair.confidentialToken.symbol,
@@ -69,7 +70,7 @@ function TokenDecryptCard({ pair }: { pair: RegistryPair }) {
         decryptedAt: Date.now(),
       });
     }
-  }, [decryptedBalance?.toString()]);
+  }, [decryptedBalance?.toString(), contractAddress]);
 
   const cachedResult = useDecryptStore(
     (s) => s.results[contractAddress.toLowerCase()],
@@ -88,7 +89,17 @@ function TokenDecryptCard({ pair }: { pair: RegistryPair }) {
 
   async function handleRefresh() {
     await recheckPermit();
-    await refetchBalance();
+    const result = await refetchBalance();
+    if (result.data !== undefined && isRealBalance(result.data)) {
+      setResult(contractAddress, {
+        address: contractAddress,
+        symbol: pair.confidentialToken.symbol,
+        name: pair.confidentialToken.name,
+        decryptedBalance: result.data,
+        formattedBalance: formatTokenAmount(result.data, pair.confidentialToken.decimals),
+        decryptedAt: Date.now(),
+      });
+    }
   }
 
   const error = grantError || balanceError;
@@ -137,6 +148,7 @@ function TokenDecryptCard({ pair }: { pair: RegistryPair }) {
             variant="outline"
             onClick={handleRefresh}
             isLoading={balanceLoading}
+            disabled={balanceLoading}
           >
             Refresh Balance
           </Button>
@@ -173,6 +185,30 @@ function PasteDecrypt() {
   const [addr, setAddr] = useState('');
   const [addrError, setAddrError] = useState('');
   const [submitted, setSubmitted] = useState<Address | null>(null);
+  const { data: tokenName } = useReadContract({
+    address: submitted ?? '0x0000000000000000000000000000000000000000',
+    abi: [{ name: 'name', type: 'function', stateMutability: 'view', inputs: [], outputs: [{ type: 'string' }] }] as const,
+    functionName: 'name',
+    query: { enabled: !!submitted },
+  });
+
+  const { data: tokenDecimals } = useReadContract({
+    address: submitted ?? '0x0000000000000000000000000000000000000000',
+    abi: [{ name: 'decimals', type: 'function', stateMutability: 'view', inputs: [], outputs: [{ type: 'uint8' }] }] as const,
+    functionName: 'decimals',
+    query: { enabled: !!submitted },
+  });
+
+  const { data: tokenSymbol } = useReadContract({
+    address: submitted ?? '0x0000000000000000000000000000000000000000',
+    abi: [{ name: 'symbol', type: 'function', stateMutability: 'view', inputs: [], outputs: [{ type: 'string' }] }] as const,
+    functionName: 'symbol',
+    query: { enabled: !!submitted },
+  });
+
+  const resolvedDecimals = (tokenDecimals as number | undefined) ?? 6;
+  const resolvedSymbol = (tokenSymbol as string | undefined) ?? 'TOKEN';
+  const resolvedName = (tokenName as string | undefined) ?? 'Custom Token';
   const { setResult } = useDecryptStore();
 
   const { data: hasPermit, refetch: recheckPermit } = useHasPermit({
@@ -223,7 +259,17 @@ function PasteDecrypt() {
     try {
       await grantPermit([submitted]);
       await recheckPermit();
-      await refetchBalance();
+      const result = await refetchBalance();
+      if (result.data !== undefined && isRealBalance(result.data)) {
+        setResult(submitted, {
+          address: submitted,
+          symbol: resolvedSymbol,
+          name: resolvedName,
+          decryptedBalance: result.data,
+          formattedBalance: formatTokenAmount(result.data, resolvedDecimals),
+          decryptedAt: Date.now(),
+        });
+      }
     } catch { }
   }
 
@@ -251,6 +297,12 @@ function PasteDecrypt() {
         {submitted && (
           <div className="space-y-3">
             <div className="rounded-lg bg-zinc-800/50 p-3 text-xs space-y-1">
+              {resolvedName !== 'Custom Token' && (
+                <div className="flex justify-between text-zinc-400">
+                  <span>Token</span>
+                  <span className="text-zinc-200 font-medium">{resolvedName} ({resolvedSymbol})</span>
+                </div>
+              )}
               <div className="flex justify-between text-zinc-400">
                 <span>Address</span>
                 <span className="font-data">{shortAddress(submitted)}</span>
@@ -265,12 +317,11 @@ function PasteDecrypt() {
                 <div className="flex justify-between text-zinc-400">
                   <span>Balance</span>
                   <span className="text-emerald-400 font-data font-semibold">
-                    {formatTokenAmount(decryptedBalance, 18)}
+                    {formatTokenAmount(decryptedBalance, resolvedDecimals)}
                   </span>
                 </div>
               )}
             </div>
-
             {hasPermit ? (
               <Button className="w-full" onClick={() => refetchBalance()} isLoading={balanceLoading}>
                 Refresh Balance
