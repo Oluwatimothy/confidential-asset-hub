@@ -15,9 +15,9 @@ import type { Address } from 'viem';
 // ── Client factory ────────────────────────────────────────────
 function getPublicClient(chainId: SupportedChainId): PublicClient {
   const chain = chainId === CHAIN_IDS.MAINNET ? mainnet : sepolia;
-  const rpcUrl = chainId === CHAIN_IDS.MAINNET
-    ? (process.env.NEXT_PUBLIC_MAINNET_RPC_URL ?? 'https://eth-mainnet.public.blastapi.io')
-    : (process.env.NEXT_PUBLIC_SEPOLIA_RPC_URL  ?? 'https://eth-sepolia.public.blastapi.io');
+  const network = chainId === CHAIN_IDS.MAINNET ? 'mainnet' : 'sepolia';
+  const baseUrl = typeof window !== 'undefined' ? window.location.origin : 'http://localhost:3000';
+  const rpcUrl = `${baseUrl}/api/rpc/${network}`;
   return createPublicClient({ chain, transport: http(rpcUrl) }) as PublicClient;
 }
 
@@ -25,20 +25,20 @@ function getPublicClient(chainId: SupportedChainId): PublicClient {
 async function fetchOnChainPairs(
   chainId: SupportedChainId,
 ): Promise<TokenWrapperPair[]> {
-  const client  = getPublicClient(chainId);
+  const client = getPublicClient(chainId);
   const address = REGISTRY_ADDRESSES[chainId];
 
   const raw = await client.readContract({
     address,
-    abi:          REGISTRY_ABI,
+    abi: REGISTRY_ABI,
     functionName: 'getTokenConfidentialTokenPairs',
   });
 
   return (raw as Array<{ tokenAddress: Address; confidentialTokenAddress: Address; isValid: boolean }>).map(
     (p) => ({
-      tokenAddress:             p.tokenAddress,
+      tokenAddress: p.tokenAddress,
       confidentialTokenAddress: p.confidentialTokenAddress,
-      isValid:                  p.isValid,
+      isValid: p.isValid,
     }),
   );
 }
@@ -56,8 +56,8 @@ async function resolveERC20Metadata(
     ]);
     return {
       address,
-      name:     name as string,
-      symbol:   symbol as string,
+      name: name as string,
+      symbol: symbol as string,
       decimals: Number(decimals),
     };
   } catch {
@@ -80,8 +80,8 @@ async function resolveERC7984Metadata(
     return {
       info: {
         address,
-        name:     name as string,
-        symbol:   symbol as string,
+        name: name as string,
+        symbol: symbol as string,
         decimals: Number(decimals),
       },
       rate: rate as bigint,
@@ -110,11 +110,11 @@ export async function fetchOfficialRegistry(
       return {
         token,
         confidentialToken: confidentialData.info,
-        rate:              confidentialData.rate,
-        isValid:           pair.isValid,
-        source:            'official',
+        rate: confidentialData.rate,
+        isValid: pair.isValid,
+        source: 'official',
         chainId,
-        addedAt:           Date.now(),
+        addedAt: Date.now(),
       };
     }),
   );
@@ -167,10 +167,10 @@ export async function fetchRegistryPair(
   try {
     const client = getPublicClient(chainId);
     const [isValid, confidentialTokenAddress] = (await client.readContract({
-      address:      REGISTRY_ADDRESSES[chainId],
-      abi:          REGISTRY_ABI,
+      address: REGISTRY_ADDRESSES[chainId],
+      abi: REGISTRY_ABI,
       functionName: 'getConfidentialTokenAddress',
-      args:         [erc20Address],
+      args: [erc20Address],
     })) as [boolean, Address];
 
     if (!confidentialTokenAddress || confidentialTokenAddress === '0x0000000000000000000000000000000000000000') {
@@ -185,11 +185,11 @@ export async function fetchRegistryPair(
     return {
       token,
       confidentialToken: confidentialData.info,
-      rate:              confidentialData.rate,
+      rate: confidentialData.rate,
       isValid,
-      source:            'official',
+      source: 'official',
       chainId,
-      addedAt:           Date.now(),
+      addedAt: Date.now(),
     };
   } catch {
     return null;
@@ -205,9 +205,9 @@ export async function validateERC7984Address(
     const client = getPublicClient(chainId);
     const supported = await client.readContract({
       address,
-      abi:          ERC7984_ABI,
+      abi: ERC7984_ABI,
       functionName: 'supportsInterface',
-      args:         ['0x4958f2a4'],
+      args: ['0x4958f2a4'],
     });
     return supported as boolean;
   } catch {
