@@ -14,24 +14,24 @@ export interface CustomPairEntry
 }
 
 export const CUSTOM_PAIRS: CustomPairEntry[] = [
-  {
-    token: {
-      address: '0x9b5Cd13b8eFbB58Dc25A05CF411D8056058aDFfF',
-      name: 'USD Coin (Mock)',
-      symbol: 'USDC',
-      decimals: 6,
-    },
-    confidentialToken: {
-      address: '0x7c5BF43B851c1dff1a4feE8dB225b87f2C223639',
-      name: 'Confidential USDC (Mock)',
-      symbol: 'cUSDCMock',
-      decimals: 6,
-    },
-    rate: 1n,
-    chainId: CHAIN_IDS.SEPOLIA,
-    notes: 'Official Sepolia testnet mock',
-    addedAt: 1719360000000,
-  },
+  // {
+  //   token: {
+  //     address: '0x9b5Cd13b8eFbB58Dc25A05CF411D8056058aDFfF',
+  //     name: 'USD Coin (Mock)',
+  //     symbol: 'USDC',
+  //     decimals: 6,
+  //   },
+  //   confidentialToken: {
+  //     address: '0x7c5BF43B851c1dff1a4feE8dB225b87f2C223639',
+  //     name: 'Confidential USDC (Mock)',
+  //     symbol: 'cUSDCMock',
+  //     decimals: 6,
+  //   },
+  //   rate: 1n,
+  //   chainId: CHAIN_IDS.SEPOLIA,
+  //   notes: 'Official Sepolia testnet mock',
+  //   addedAt: 1719360000000,
+  // },
   {
     token: {
       address: '0xa7dA08FafDC9097Cc0E7D4f113A61e31d7e8e9b0',
