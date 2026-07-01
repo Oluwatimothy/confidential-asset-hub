@@ -1,543 +1,207 @@
 # Confidential Asset Hub
 
-> **The Canonical Gateway to Confidential Assets on Zama**
+A web application for the Zama Wrappers Registry ecosystem. It lets a user connect a wallet, browse the official ERC20 to ERC7984 wrapper pairs on Sepolia, wrap and unwrap between them, decrypt any ERC7984 balance using EIP-712 user decryption, transfer confidential registry tokens, and claim testnet tokens from a faucet.
 
-[![CI](https://github.com/your-org/confidential-asset-hub/actions/workflows/ci.yml/badge.svg)](https://github.com/your-org/confidential-asset-hub/actions)
 [![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](https://opensource.org/licenses/MIT)
 [![Built with Next.js](https://img.shields.io/badge/Next.js-15-black)](https://nextjs.org)
 [![Powered by Zama](https://img.shields.io/badge/Powered%20by-Zama%20FHEVM-yellow)](https://zama.ai)
 
----
+## Live deployment
 
-## Overview
+https://confidential-asset-hub.vercel.app
 
-Confidential Asset Hub is a **production-grade, open-source frontend** for the Zama Wrappers Registry ecosystem. It serves as a unified interface for interacting with ERC7984 confidential tokens; wrapping, unwrapping, decrypting, and exploring the official on-chain registry.
+## Why this exists
 
-Built to a standard comparable to Vercel Dashboard, Alchemy, and Stripe — not a hackathon prototype.
+Zama's FHEVM brings fully homomorphic encryption on chain, and ERC7984 is the resulting standard for confidential tokens: balances and transfer amounts are stored as ciphertext handles rather than plaintext numbers. Zama maintains an official Wrappers Registry of ERC20 to ERC7984 pairs on Sepolia, but there was no single, polished frontend for actually using it. Without one, developers tend to spin up their own test tokens instead of the canonical ones, which fragments the ecosystem: every project ends up with a slightly different set of tokens that don't interoperate.
 
-### Live Demo
+This app is a usable product built directly on top of that registry, so wrapping, unwrapping, decrypting, and transferring the official pairs is the easy path rather than something every team reimplements.
 
-🔗 **[https://confidential-asset-hub.vercel.app](https://confidential-asset-hub.vercel.app)** *(placeholder)*
+## Features
 
-🎥 **[Demo Video](https://youtu.be/placeholder)** *(placeholder)*
+* Registry Explorer that reads the on chain Wrappers Registry and renders every pair with live token metadata
+* Wrap: convert a registry ERC20 into its ERC7984 confidential equivalent
+* Unwrap: convert an ERC7984 confidential token back to its ERC20 equivalent, including the finalize step once the Zama network has decrypted the request
+* Decrypt: reveal your own balance of any ERC7984 token via EIP-712 user decryption, either from the registry list or by pasting an arbitrary ERC7984 contract address
+* Transfer: send a registry confidential token to another address once your balance is decrypted
+* Faucet: claim each official Sepolia cTokenMock listed in the registry
+* Portfolio view across all registry pairs
+* A working network guard: connecting on any chain other than Sepolia shows a banner with a one click switch action, instead of silently failing
 
----
+## Supported network
 
-## Problem Statement
+Sepolia only. The app deliberately does not attempt Ethereum Mainnet. If a wallet is connected to any other chain, every page that needs contract access shows a banner prompting a switch to Sepolia.
 
-Zama's FHEVM enables fully homomorphic encryption on-chain. ERC7984 confidential tokens bring encrypted balances and transfers to Ethereum. However, there has been no canonical, polished frontend for:
+## How the registry is sourced
 
-- Browsing the official on-chain Wrappers Registry
-- Wrapping ERC20 tokens into their confidential counterparts
-- Unwrapping confidential tokens back to ERC20
-- Decrypting encrypted balances via EIP-712 user decryption
-- Claiming testnet faucet tokens for development
+The registry is hybrid, combining two sources:
 
-Confidential Asset Hub fills this gap.
+1. The official on chain Wrappers Registry contract, read directly via viem. This is the primary source of truth.
+2. A local config file, `src/config/custom-pairs.ts`, for pairs that are not (yet) in the official registry: dev tokens, or pairs added ahead of an official listing.
 
----
+Both sources are fetched, merged, and deduplicated by chain ID and token address. When the same pair exists in both places, the official on chain entry always wins. The merged result is cached for five minutes via React Query and exposed through the `useRegistry()` hook, which every page (Wrap, Unwrap, Decrypt, Transfer, Portfolio) reads from.
 
-## Solution
+## Adding a new pair
 
-A full-stack Next.js 15 application that integrates:
+There is no admin UI or on chain registration flow for this; new pairs are added to the local config and shipped with the app. This keeps the mechanism simple, reviewable in a pull request, and clearly separated from the official registry.
 
-- **Zama FHEVM SDK** (`@zama-fhe/sdk`, `@zama-fhe/react-sdk`) for EIP-712 decryption and encrypted input generation
-- **On-chain Registry** (`ConfidentialTokenWrappersRegistry`) read via viem
-- **Hybrid Registry** — official on-chain pairs merged with local custom pairs
-- **wagmi + RainbowKit** for type-safe Ethereum interaction
+1. Open `src/config/custom-pairs.ts`.
+2. Add an entry to the `CUSTOM_PAIRS` array:
 
-
----
-
-## Architecture
-
-```
-┌─────────────────────────────────────────────────────────────────┐
-│                        Next.js 15 App Router                      │
-│                                                                     │
-│  ┌──────────┐  ┌───────────┐  ┌─────────┐  ┌──────────────────┐  │
-│  │Dashboard │  │ Registry  │  │Portfolio│  │   Wrap / Unwrap  │  │
-│  │          │  │ Explorer  │  │         │  │   Decrypt Faucet │  │
-│  └──────────┘  └───────────┘  └─────────┘  └──────────────────┘  │
-│                                                                     │
-│  ┌─────────────────────────────────────────────────────────────┐  │
-│  │                      Service Layer                           │  │
-│  │  RegistryService │ WrapService │ UnwrapService │ DecryptSvc │  │
-│  └─────────────────────────────────────────────────────────────┘  │
-│                                                                     │
-│  ┌─────────────────────────────────────────────────────────────┐  │
-│  │                 Blockchain Integration Layer                  │  │
-│  │  wagmi hooks │ viem PublicClient │ Zama SDK │ RainbowKit     │  │
-│  └─────────────────────────────────────────────────────────────┘  │
-│                                                                     │
-│  ┌─────────────────────────────────────────────────────────────┐  │
-│  │              State (Zustand + React Query)                    │  │
-│  │  registryStore │ decryptStore │ txStore │ faucetStore │ UI   │  │
-│  └─────────────────────────────────────────────────────────────┘  │
-└─────────────────────────────────────────────────────────────────────┘
-         │                    │                     │
-    Ethereum Mainnet     Sepolia Testnet       Zama Relayer
-    (Registry, Tokens)   (Registry, Faucet)   (Decryption)
+```typescript
+export const CUSTOM_PAIRS: CustomPairEntry[] = [
+  // ...existing entries
+  {
+    token: {
+      address: '0xYourERC20Address',
+      name: 'My Token',
+      symbol: 'MYT',
+      decimals: 18,
+    },
+    confidentialToken: {
+      address: '0xYourERC7984WrapperAddress',
+      name: 'Confidential My Token',
+      symbol: 'cMYT',
+      decimals: 6,
+    },
+    rate: 1_000_000_000_000n, // underlying units per confidential unit, see note below
+    chainId: 11155111, // Sepolia
+    notes: 'Description of this pair',
+    addedAt: Date.now(),
+  },
+];
 ```
 
----
+A note on `rate`: ERC7984 tokens always use 6 decimals. For an 18 decimal underlying token wrapped 1:1 in human terms, the rate is `10 ** (18 - 6)`, i.e. `1_000_000_000_000n`. For a 6 decimal underlying token, the rate is `1n`.
 
-## Folder Structure
+3. Rebuild and redeploy. The pair then appears automatically in the Registry Explorer, Portfolio, Wrap, Unwrap, and Transfer pages, since all of them read from the same merged registry.
+
+If a pair with the same `chainId` and token address is later added to the official on chain registry, that entry takes over automatically and the custom entry is ignored, so no cleanup is required.
+
+## Core flows
+
+### Wrap
+
+The user picks a registry pair and an amount. The app checks the current ERC20 allowance for the wrapper contract; if it is insufficient, an approval transaction is sent for exactly the amount being wrapped, not an unlimited allowance. Once approved, the wrap transaction mints the confidential ERC7984 balance.
+
+### Unwrap
+
+This is a two step process required by the confidential token design. First, an unwrap request burns the encrypted amount and emits a request ID. The Zama network then decrypts that request off chain. Once that resolves, a second, separate finalize transaction releases the underlying ERC20 to the recipient.
+
+### Decrypt
+
+Balances are stored on chain as ciphertext handles, not numbers, so nothing about them is visible from a block explorer. To reveal one, the wallet signs an EIP-712 permit (no gas cost), which authorizes the Zama relayer to re-encrypt the balance so only that wallet can read it. This works for any ERC7984 token, not only ones in the registry: the Decrypt page has a Paste Address mode that reads token metadata directly from a pasted contract and runs the same permit and decrypt flow against it.
+
+### Transfer
+
+Once a registry confidential token's balance has been decrypted (so the sender knows what they are working with), an amount and recipient can be entered and sent via `confidentialTransfer`. The transferred amount is encrypted client side before it reaches the chain.
+
+### Faucet
+
+Lists each official cTokenMock from the Sepolia registry and lets a connected wallet claim a fixed test amount of each.
+
+## Project structure
 
 ```
-confidential-asset-hub/
-├── src/
-│   ├── app/                    # Next.js App Router pages
-│   │   ├── page.tsx            # Dashboard
-│   │   ├── registry/           # Registry Explorer
-│   │   ├── portfolio/          # Portfolio
-│   │   ├── wrap/               # Wrap Center
-│   │   ├── unwrap/             # Unwrap Center
-│   │   ├── decrypt/            # Universal Decrypt
-│   │   ├── faucet/             # Faucet Center
-│   │   ├── analytics/          # Analytics
-│   │   ├── add-pair/           # Add Custom Pair Wizard
-│   │   ├── docs/               # In-app Documentation
-│   │   ├── layout.tsx          # Root layout + providers
-│   │   └── globals.css         # Design system CSS variables
-│   │
-│   ├── components/
-│   │   ├── ui/                 # Primitives: Button, Card, Badge, Input…
-│   │   └── layout/
-│   │       ├── AppShell.tsx    # Sidebar + TopNav
-│   │       └── Providers.tsx   # Wagmi, RainbowKit, QueryClient
-│   │
-│   ├── hooks/
-│   │   ├── use-registry.ts     # Registry fetch + React Query
-│   │   ├── use-wrap.ts         # Full ERC20→ERC7984 wrap flow
-│   │   ├── use-unwrap.ts       # Two-step ERC7984→ERC20 unwrap
-│   │   ├── use-decrypt.ts      # EIP-712 user decryption
-│   │   ├── use-portfolio.ts    # Batch balance reads
-│   │   ├── use-network.ts      # Chain detection + switching
-│   │   └── use-token-metadata.ts
-│   │
-│   ├── services/
-│   │   └── registry.ts         # On-chain registry fetching + merging
-│   │
-│   ├── contracts/
-│   │   ├── registry-abi.ts     # ConfidentialTokenWrappersRegistry ABI
-│   │   ├── erc20-abi.ts        # Standard ERC20 ABI
-│   │   └── erc7984-abi.ts      # ERC7984 + ERC7984ERC20Wrapper ABI
-│   │
-│   ├── config/
-│   │   ├── chains.ts           # Chain IDs, contract addresses, relayer URLs
-│   │   ├── custom-pairs.ts     # ← ADD YOUR CUSTOM PAIRS HERE
-│   │   └── faucet-tokens.ts    # Testnet faucet token config
-│   │
-│   ├── stores/
-│   │   └── index.ts            # Zustand stores (registry, decrypt, tx, faucet, ui)
-│   │
-│   ├── types/
-│   │   └── index.ts            # All TypeScript types
-│   │
-│   └── utils/
-│       └── index.ts            # Shared utilities (formatting, parsing, etc.)
-│
-├── tests/
-│   ├── unit/
-│   │   └── registry.test.ts    # Unit tests for services + utils
-│   └── setup.ts
-│
-├── .github/
-│   └── workflows/
-│       └── ci.yml              # CI/CD: lint, typecheck, test, build, deploy
-│
-├── .env.example                # Environment variable template
-├── next.config.mjs
-├── tailwind.config.ts
-├── tsconfig.json
-├── vitest.config.ts
-└── README.md
+src/
+  app/                     Next.js App Router pages
+    page.tsx               Dashboard
+    registry/               Registry Explorer
+    portfolio/               Portfolio
+    wrap/                     Wrap
+    unwrap/                   Unwrap
+    decrypt/                  Decrypt (registry and paste address modes)
+    transfer/                 Transfer
+    faucet/                   Faucet
+    add-pair/                 Custom pair wizard
+    docs/                     In app documentation
+    api/rpc/[network]/        Server side RPC proxy
+    api/relayer/[...path]/    Server side relayer proxy
+  components/
+    ui/                      Shared UI primitives
+    layout/                  App shell, sidebar, providers
+    NetworkGuard.tsx         Wrong network banner and switch action
+  hooks/                    useRegistry, useNetwork, usePortfolio, useTokenMetadata
+  services/registry.ts      On chain registry read, merge, and dedup logic
+  contracts/                 ABIs: registry, ERC20, ERC7984
+  config/                    Chain IDs, contract addresses, custom pairs, faucet tokens
+  stores/                    Zustand stores (registry, decrypt results, transactions, faucet claims, UI)
+  types/                    Shared TypeScript types
+  utils/                    Formatting, validation, and error parsing helpers
 ```
 
----
+## Getting started
 
-## Installation
-
-### Prerequisites
-
-- Node.js 20+
-- npm 10+
-- A [WalletConnect Cloud](https://cloud.walletconnect.com) Project ID
-
-### Steps
+Prerequisites: Node.js 20 or later, and a WalletConnect Cloud project ID from https://cloud.walletconnect.com.
 
 ```bash
-# 1. Clone
-git clone https://github.com/your-org/confidential-asset-hub.git
+git clone <this-repo-url>
 cd confidential-asset-hub
-
-# 2. Install dependencies
 npm install
-
-# 3. Configure environment
 cp .env.example .env.local
-# Edit .env.local and fill in NEXT_PUBLIC_WALLETCONNECT_PROJECT_ID
-
-# 4. Run locally
+# set NEXT_PUBLIC_WALLETCONNECT_PROJECT_ID in .env.local
 npm run dev
 ```
 
-Open [http://localhost:3000](http://localhost:3000).
+Then open http://localhost:3000.
 
----
-
-## Environment Variables
+## Environment variables
 
 | Variable | Required | Description |
 |---|---|---|
-| `NEXT_PUBLIC_WALLETCONNECT_PROJECT_ID` | ✅ | WalletConnect Cloud project ID |
-| `NEXT_PUBLIC_SEPOLIA_RPC_URL` | Optional | Custom Sepolia RPC (defaults to public) |
-| `NEXT_PUBLIC_MAINNET_RPC_URL` | Optional | Custom Mainnet RPC |
-| `NEXT_PUBLIC_REGISTRY_ADDRESS_SEPOLIA` | Optional | Override Sepolia registry address |
-| `NEXT_PUBLIC_REGISTRY_ADDRESS_MAINNET` | Optional | Override Mainnet registry address |
-| `NEXT_PUBLIC_RELAYER_URL_SEPOLIA` | Optional | Override Sepolia relayer URL |
-| `NEXT_PUBLIC_RELAYER_URL_MAINNET` | Optional | Override Mainnet relayer URL |
+| `NEXT_PUBLIC_WALLETCONNECT_PROJECT_ID` | Yes | WalletConnect Cloud project ID used by RainbowKit. Falls back to a demo ID if unset, which is not suitable for production use. |
+| `SEPOLIA_RPC_URL` | No | Overrides the default public Sepolia RPC endpoint used by the server side RPC proxy at `app/api/rpc/[network]`. |
+| `MAINNET_RPC_URL` | No | Overrides the default public Mainnet RPC endpoint used by the same proxy. Not exercised by the current UI since the app is Sepolia only. |
 
----
+RPC and relayer requests are proxied through the app's own API routes rather than calling public endpoints directly from the browser, so no RPC provider key is ever exposed client side.
 
-## Local Development
+## Available scripts
 
 ```bash
-npm run dev          # Start dev server (http://localhost:3000)
-npm run build        # Production build
-npm run start        # Serve production build
-npm run typecheck    # TypeScript check
-npm run lint         # ESLint
-npm run test         # Vitest watch mode
-npm run test:run     # Vitest one-shot
+npm run dev          # Start the dev server
+npm run build         # Production build
+npm run start          # Serve the production build
+npm run lint             # ESLint
+npm run typecheck         # tsc --noEmit
+npm run test                # Vitest, watch mode
+npm run test:run             # Vitest, single run
+npm run test:ui               # Vitest UI
 ```
 
----
-
-## Supported Networks
-
-| Network | Chain ID | Registry | Faucet |
-|---|---|---|---|
-| Ethereum Mainnet | 1 | ✅ `0xeb5015fF…` | ❌ |
-| Sepolia Testnet | 11155111 | ✅ `0xeb5015fF…` | ✅ |
-
-The app defaults to Sepolia. Switch networks via your wallet — the UI updates automatically.
-
----
-
-## Deployed Contract Addresses
-
-### FHEVM — Ethereum Mainnet
+## Deployed contract addresses (Sepolia)
 
 | Contract | Address |
 |---|---|
-| ACL Contract | `0xcA2E8f1F656CD25C01F05d0b243Ab1ecd4a8ffb6` |
-| FHEVM Executor | `0xD82385dADa1ae3E969447f20A3164F6213100e75` |
-| KMS Verifier | `0x77627828a55156b04Ac0DC0eb30467f1a552BB03` |
-
-### FHEVM — Sepolia Testnet
-
-| Contract | Address |
-|---|---|
+| Wrappers Registry | `0x2f0750Bbb0A246059d80e94c454586a7F27a128e` |
 | ACL Contract | `0xf0Ffdc93b7E186bC2f8CB3dAA75D86d1930A433D` |
 | FHEVM Executor | `0x92C920834Ec8941d2C77D188936E1f7A6f49c127` |
 | KMS Verifier | `0xbE0E383937d564D7FF0BC3b46c51f0bF8d5C311A` |
 | Input Verifier | `0xBBC1fFCdc7C316aAAd72E807D9b0272BE8F84DA0` |
 | Decryption Address | `0x5D8BD78e2ea6bbE41f26dFe9fdaEAa349e077478` |
 
-### Wrappers Registry (Both Networks)
+The official Sepolia cTokenMock addresses claimable from the faucet, and their corresponding wrapper addresses, are listed in `src/config/faucet-tokens.ts`.
 
-| Contract | Address |
-|---|---|
-| ConfidentialTokenWrappersRegistry | `0xeb5015fF021DB115aCe010f23F55C2591059bBA0` |
+## Security notes
 
----
+* All user supplied addresses (recipient in Transfer, pasted contract in Decrypt) are validated with viem's `isAddress` before use.
+* Wrap approvals are for the exact amount being wrapped, never an unlimited allowance.
+* RPC and relayer calls go through server side proxy routes, so no provider API key is exposed to the browser.
+* EIP-712 permit signing and balance decryption are handled by the Zama SDK (`@zama-fhe/react-sdk`); this app does not implement its own cryptography.
 
-## Registry Architecture
-
-The registry uses a **hybrid** model:
-
-```
-┌─────────────────────────────┐
-│  On-chain Registry Contract  │  ← primary source
-│  getTokenConfidentialToken   │
-│  Pairs() → pairs[]           │
-└─────────────┬───────────────┘
-              │
-              ▼
-┌─────────────────────────────┐
-│   src/config/custom-pairs.ts │  ← secondary source
-│   CUSTOM_PAIRS[]             │
-└─────────────┬───────────────┘
-              │
-              ▼
-┌─────────────────────────────┐
-│   mergeRegistries()          │  ← dedup by address+chainId
-│   Unified pair list          │
-└─────────────────────────────┘
-```
-
-Both sources are merged, deduplicated by `chainId:tokenAddress`, and cached for 5 minutes via React Query. Official pairs always take precedence over custom pairs with the same key.
-
----
-
-## Wrap Flow
-
-```
-User selects pair + amount
-         │
-         ▼
-Check ERC20 allowance
-         │
-    allowance < amount?
-    ┌────┴────┐
-   YES       NO
-    │         │
-    ▼         │
-approve(wrapper, maxUint256)
-    │         │
-    └────┬────┘
-         ▼
-wrap(to, amount)  →  ERC7984 minted (encrypted)
-         │
-         ▼
-Balance refreshed · success state
-```
-
----
-
-## Unwrap Flow
-
-```
-User selects wrapper + amount
-         │
-         ▼
-SDK generates encrypted amount + inputProof
-         │
-         ▼
-unwrap(from, to, encryptedAmount, inputProof)
-→  emits UnwrapRequested(requestId)
-         │
-         ▼
-Zama decryption network decrypts requestId
-         │
-         ▼
-finalizeUnwrap(requestId, clearAmount, decryptionProof)
-→  ERC20 released to recipient
-```
-
----
-
-## Decryption Flow (EIP-712)
-
-```
-User clicks "Decrypt Balance"
-         │
-         ▼
-SDK generates EIP-712 typed-data struct
-{ token, holder, expiry, publicKey }
-         │
-         ▼
-Wallet signs the struct
-         │
-         ▼
-Signed message + public key → Zama Relayer
-         │
-         ▼
-Relayer re-encrypts balance under user's public key
-         │
-         ▼
-SDK decrypts locally in browser
-         │
-         ▼
-Plaintext balance displayed · cached in decryptStore
-```
-
----
-
-## Faucet Flow
-
-```
-User visits Faucet Center
-         │
-         ▼
-Tokens loaded from config/faucet-tokens.ts
-         │
-         ▼
-User clicks "Claim"
-         │
-         ▼
-claim() called on mock ERC20 faucet contract
-         │
-         ▼
-Transaction confirmed → 24h cooldown starts
-         │
-         ▼
-Claim recorded in faucetStore (persisted to localStorage)
-```
-
----
-
-## Security Considerations
-
-| Concern | Mitigation |
-|---|---|
-| Invalid addresses | All user addresses validated with viem `isAddress()` before any contract call |
-| Signature replay | EIP-712 decryption structs include an expiry timestamp |
-| Unsafe ERC7984 addresses | `supportsInterface(0x4958f2a4)` verified before decrypt |
-| User input validation | Zod schemas on all forms; server-side validation via smart contract |
-| Infinite approval | Uses `maxUint256` approve with clear warning in UI; users can revoke via their wallet |
-| RPC poisoning | All RPC calls use typed viem clients; no `eval` or dynamic code execution |
-| Duplicate pairs | Registry merge deduplicates by address+chainId; duplicates silently dropped |
-| Transaction ordering | Approval tx awaited (5s buffer) before wrap tx is submitted |
-
----
-
-## Adding New Custom Pairs
-
-### Via the UI Wizard
-
-1. Open **Add Custom Pair** in the sidebar.
-2. Fill in the ERC20 address, ERC7984 wrapper address, name, symbol, and decimals.
-3. Review the confirmation screen.
-4. Copy the generated code snippet.
-5. Paste into `src/config/custom-pairs.ts` inside the `CUSTOM_PAIRS` array.
-6. Rebuild: `npm run build`.
-
-### Directly in Code
-
-Edit `src/config/custom-pairs.ts`:
-
-```typescript
-export const CUSTOM_PAIRS: CustomPairEntry[] = [
-  {
-    token: {
-      address:  '0xYourERC20Address',
-      name:     'My Token',
-      symbol:   'MYT',
-      decimals: 18,
-    },
-    confidentialToken: {
-      address:  '0xYourERC7984WrapperAddress',
-      name:     'Confidential My Token',
-      symbol:   'cMYT',
-      decimals: 6,
-    },
-    rate:    1_000_000_000_000n, // 10^12 for 18→6 decimal conversion
-    chainId: 11155111,           // Sepolia
-    notes:   'My test pair',
-    addedAt: Date.now(),
-  },
-];
-```
-
-The pair will appear automatically in:
-- Registry Explorer
-- Portfolio
-- Wrap Center
-- Unwrap Center
-
----
-
-## Deployment
-
-### Vercel (recommended)
-
-```bash
-# Install Vercel CLI
-npm i -g vercel
-
-# Deploy
-vercel --prod
-```
-
-Set the following environment variables in your Vercel project settings:
-
-- `NEXT_PUBLIC_WALLETCONNECT_PROJECT_ID`
-- (Optional) `NEXT_PUBLIC_SEPOLIA_RPC_URL` (use Alchemy or Infura for production)
-- (Optional) `NEXT_PUBLIC_MAINNET_RPC_URL`
-
-### Docker
-
-```dockerfile
-FROM node:20-alpine AS builder
-WORKDIR /app
-COPY package*.json ./
-RUN npm ci
-COPY . .
-RUN npm run build
-
-FROM node:20-alpine AS runner
-WORKDIR /app
-COPY --from=builder /app/.next ./.next
-COPY --from=builder /app/node_modules ./node_modules
-COPY --from=builder /app/package.json ./package.json
-EXPOSE 3000
-CMD ["npm", "start"]
-```
-
-### CI/CD
-
-GitHub Actions workflow at `.github/workflows/ci.yml` handles:
-
-1. **Lint + TypeCheck** — on every push/PR
-2. **Unit Tests** — Vitest
-3. **Production Build** — Next.js build verification
-4. **Deploy Preview** — on every pull request (Vercel)
-5. **Deploy Production** — on push to `main` (Vercel)
-
-Required GitHub Secrets:
-
-| Secret | Description |
-|---|---|
-| `WALLETCONNECT_PROJECT_ID` | WalletConnect Cloud Project ID |
-| `VERCEL_TOKEN` | Vercel API token |
-| `VERCEL_ORG_ID` | Your Vercel org ID |
-| `VERCEL_PROJECT_ID` | Your Vercel project ID |
-
----
-
-## Tech Stack
+## Tech stack
 
 | Layer | Technology |
 |---|---|
-| Framework | Next.js 15 (App Router) |
-| Language | TypeScript (strict) |
-| Styling | TailwindCSS + CSS Variables |
-| Components | Custom primitives (shadcn-pattern, Radix UI) |
-| Web3 | wagmi v2 + viem v2 |
-| Wallet UI | RainbowKit v2 |
-| FHEVM | `@zama-fhe/sdk` + `@zama-fhe/react-sdk` |
-| State | Zustand v5 (with persist middleware) |
-| Server State | TanStack Query v5 |
-| Forms | React Hook Form + Zod |
-| Animations | Framer Motion |
-| Charts | Recharts |
-| Testing | Vitest + @testing-library/react |
-
----
-
-## Design System
-
-**Palette:** Yellow (`#fbbf24` / amber-400) · Black (`#09090b` / zinc-950) · White (`#f4f4f5` / zinc-100) · Grey (zinc scale)
-
-No purple. No blue. No AI-default aesthetics.
-
-The design is intentionally inspired by developer-tool products (Vercel, Linear, Stripe) — monochromatic with amber accent, generous whitespace, subtle borders, zero decoration.
-
----
+| Framework | Next.js (App Router) |
+| Language | TypeScript |
+| Styling | Tailwind CSS |
+| Components | Custom primitives on Radix UI |
+| Web3 | wagmi, viem |
+| Wallet UI | RainbowKit |
+| Confidential tokens | `@zama-fhe/sdk`, `@zama-fhe/react-sdk` |
+| State | Zustand |
+| Server state | TanStack Query |
+| Testing | Vitest |
 
 ## License
 
-MIT — see [LICENSE](LICENSE).
-
----
-
-## Acknowledgements
-
-Built for the **Zama Builder Track**. All cryptographic operations powered by [Zama's FHEVM](https://github.com/zama-ai/fhevm). Registry contract by Zama Protocol Apps team.
-
----
-
-*Confidential Asset Hub — The canonical gateway to confidential assets on Zama.*
+MIT. See `LICENSE`.
