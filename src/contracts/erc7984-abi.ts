@@ -130,6 +130,18 @@ export const ERC7984_ABI = [
     inputs: [{ name: 'unwrapRequestId', type: 'bytes32' }],
     outputs: [{ type: 'address' }],
   },
+  // confidentialTransfer(address to, externalEuint64 encryptedAmount, bytes inputProof)
+  {
+    name: 'confidentialTransfer',
+    type: 'function',
+    stateMutability: 'nonpayable',
+    inputs: [
+      { name: 'to',              type: 'address' },
+      { name: 'encryptedAmount', type: 'bytes32' }, // externalEuint64
+      { name: 'inputProof',      type: 'bytes'   },
+    ],
+    outputs: [{ type: 'bytes32' }], // euint64 transferred-amount handle
+  },
   // Operator system
   {
     name: 'setOperator',

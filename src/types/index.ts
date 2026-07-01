@@ -148,7 +148,7 @@ export interface FaucetClaimRecord {
 // ── Transaction ───────────────────────────────────────────────
 export interface TxRecord {
   hash: string;
-  type: 'wrap' | 'unwrap' | 'decrypt' | 'faucet' | 'approval';
+  type: 'wrap' | 'unwrap' | 'transfer' | 'decrypt' | 'faucet' | 'approval';
   status: 'pending' | 'confirmed' | 'failed';
   timestamp: number;
   tokenSymbol: string;
@@ -187,6 +187,7 @@ export type NavRoute =
   | '/wrap'
   | '/unwrap'
   | '/decrypt'
+  | '/transfer'
   | '/faucet'
   | '/analytics'
   | '/add-pair';
