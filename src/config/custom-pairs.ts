@@ -16,6 +16,24 @@ export interface CustomPairEntry
 export const CUSTOM_PAIRS: CustomPairEntry[] = [
   {
     token: {
+      address: '0xe5e97eCeDbF5672EFDB2dDE9F44b145556FACb89',
+      name: 'NFT TOKEN',
+      symbol: 'NTT',
+      decimals: 6,
+    },
+    confidentialToken: {
+      address: '0xe5e97eCeDbF5672EFDB2dDE9F44b145556FACb89',
+      name: 'Confidential NFT TOKEN',
+      symbol: 'cNTT',
+      decimals: 6,
+    },
+    rate: 1n,
+    chainId: 11155111,
+    notes: 'added today',
+    addedAt: 1782933318125,
+  },
+  {
+    token: {
       address: '0x9b5Cd13b8eFbB58Dc25A05CF411D8056058aDFfF',
       name: 'USD Coin (Mock)',
       symbol: 'USDC',
@@ -86,24 +104,24 @@ export const CUSTOM_PAIRS: CustomPairEntry[] = [
     notes: 'Official Sepolia testnet mock',
     addedAt: 1719360000000,
   },
-  /* {
-     token: {
-       address: '0x75355a85c6FB9df5f0C80FF54e8747EEe9a0BF57',
-       name: 'ZAMA (Mock)',
-       symbol: 'ZAMA',
-       decimals: 18,
-     },
-     confidentialToken: {
-       address: '0xf2D628d2598aF4eAF94CB76a437Ff86CA78FfbFB',
-       name: 'Confidential ZAMA (Mock)',
-       symbol: 'cZAMAMock',
-       decimals: 6,
-     },
-     rate: 1_000_000_000_000n,
-     chainId: CHAIN_IDS.SEPOLIA,
-     notes: 'Official Sepolia testnet mock',
-     addedAt: 1719360000000,
-   },*/
+  {
+    token: {
+      address: '0x75355a85c6FB9df5f0C80FF54e8747EEe9a0BF57',
+      name: 'ZAMA (Mock)',
+      symbol: 'ZAMA',
+      decimals: 18,
+    },
+    confidentialToken: {
+      address: '0xf2D628d2598aF4eAF94CB76a437Ff86CA78FfbFB',
+      name: 'Confidential ZAMA (Mock)',
+      symbol: 'cZAMAMock',
+      decimals: 6,
+    },
+    rate: 1_000_000_000_000n,
+    chainId: CHAIN_IDS.SEPOLIA,
+    notes: 'Official Sepolia testnet mock',
+    addedAt: 1719360000000,
+  },
   {
     token: {
       address: '0x93c931278A2aad1916783F952f94276eA5111442',
