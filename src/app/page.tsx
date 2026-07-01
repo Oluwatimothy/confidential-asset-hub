@@ -249,8 +249,8 @@ export default function DashboardPage() {
                 <CardTitle className="text-base">Recent Activity</CardTitle>
                 <CardDescription>Your last 5 transactions</CardDescription>
               </div>
-              {records.length > 0 && (
-                <Link href="/portfolio">
+              {address && (
+                <Link href={`https://sepolia.etherscan.io/address/${address}`} target="_blank" rel="noopener noreferrer">
                   <Button variant="ghost" size="sm" className="text-xs">
                     View all
                   </Button>
@@ -275,8 +275,8 @@ export default function DashboardPage() {
                     >
                       <div className="flex items-center gap-2.5 min-w-0">
                         <div className={`h-2 w-2 rounded-full shrink-0 ${tx.status === 'confirmed' ? 'bg-emerald-400' :
-                            tx.status === 'failed' ? 'bg-red-400' :
-                              'bg-amber-400 animate-pulse'
+                          tx.status === 'failed' ? 'bg-red-400' :
+                            'bg-amber-400 animate-pulse'
                           }`} />
                         <div className="min-w-0">
                           <p className="text-xs font-medium text-zinc-300 capitalize truncate">
