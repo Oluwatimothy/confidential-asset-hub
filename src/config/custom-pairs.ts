@@ -16,24 +16,6 @@ export interface CustomPairEntry
 export const CUSTOM_PAIRS: CustomPairEntry[] = [
   {
     token: {
-      address: '0xe5e97eCeDbF5672EFDB2dDE9F44b145556FACb89',
-      name: 'NFT TOKEN',
-      symbol: 'NTT',
-      decimals: 6,
-    },
-    confidentialToken: {
-      address: '0xe5e97eCeDbF5672EFDB2dDE9F44b145556FACb89',
-      name: 'Confidential NFT TOKEN',
-      symbol: 'cNTT',
-      decimals: 6,
-    },
-    rate: 1n,
-    chainId: 11155111,
-    notes: 'added today',
-    addedAt: 1782933318125,
-  },
-  {
-    token: {
       address: '0x9b5Cd13b8eFbB58Dc25A05CF411D8056058aDFfF',
       name: 'USD Coin (Mock)',
       symbol: 'USDC',
