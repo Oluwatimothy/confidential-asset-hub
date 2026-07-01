@@ -14,6 +14,7 @@ import { useRegistry } from '@/hooks/use-registry';
 import { useNetwork } from '@/hooks/use-network';
 import { formatTokenAmount, parseContractError, getTxUrl } from '@/utils';
 import { ERC20_ABI } from '@/contracts/erc20-abi';
+import { NetworkGuard } from '@/components/NetworkGuard';
 import { ConnectButton } from '@rainbow-me/rainbowkit';
 import { parseUnits, formatUnits } from 'viem';
 import type { RegistryPair } from '@/types';
@@ -421,6 +422,8 @@ function WrapPageInner() {
           Convert public ERC20 tokens into encrypted ERC7984 confidential tokens.
         </p>
       </div>
+
+      <NetworkGuard />
 
       <Card>
         <CardHeader className="pb-3">

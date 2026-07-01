@@ -13,6 +13,7 @@ import { useNetwork } from '@/hooks/use-network';
 import { getFaucetTokensByChain } from '@/config/faucet-tokens';
 import { getTxUrl, formatDate, parseContractError } from '@/utils';
 import { ConnectButton } from '@rainbow-me/rainbowkit';
+import { NetworkGuard } from '@/components/NetworkGuard';
 import { parseUnits } from 'viem';
 import type { FaucetToken } from '@/types';
 
@@ -187,7 +188,7 @@ function FaucetCard({ token }: { token: FaucetToken }) {
 
 export default function FaucetPage() {
   const { isConnected } = useAccount();
-  const { chainId, isSepolia } = useNetwork();
+  const { chainId } = useNetwork();
   const tokens = getFaucetTokensByChain(chainId);
   const { claims } = useFaucetStore();
 
@@ -208,12 +209,7 @@ export default function FaucetPage() {
         <p className="text-sm text-zinc-500 mt-1">Claim mock ERC20 tokens on Sepolia. Max 10,000 per claim.</p>
       </div>
 
-      {!isSepolia && (
-        <div className="rounded-xl border border-amber-400/30 bg-amber-400/5 p-4">
-          <p className="text-sm text-amber-400 font-medium">Switch to Sepolia</p>
-          <p className="text-xs text-zinc-400 mt-1">Faucet tokens are only available on Sepolia testnet.</p>
-        </div>
-      )}
+      <NetworkGuard />
 
       <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
         {tokens.map((token) => <FaucetCard key={token.address} token={token} />)}

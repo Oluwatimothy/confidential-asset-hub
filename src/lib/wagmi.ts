@@ -10,7 +10,7 @@ const getBase = () =>
 export const wagmiConfig = getDefaultConfig({
   appName: 'Confidential Asset Hub',
   projectId: process.env.NEXT_PUBLIC_WALLETCONNECT_PROJECT_ID ?? 'demo',
-  chains: [sepolia],
+  chains: [sepolia, mainnet],
   transports: {
     [sepolia.id]: http(`${getBase()}/api/rpc/sepolia`),
     [mainnet.id]: http(`${getBase()}/api/rpc/mainnet`),

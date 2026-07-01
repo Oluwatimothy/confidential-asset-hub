@@ -17,6 +17,7 @@ import { useNetwork } from '@/hooks/use-network';
 import { useDecryptStore } from '@/stores';
 import { formatTokenAmount, isValidAddress, timeAgo, shortAddress } from '@/utils';
 import { ConnectButton } from '@rainbow-me/rainbowkit';
+import { NetworkGuard } from '@/components/NetworkGuard';
 import type { Address } from 'viem';
 import type { RegistryPair } from '@/types';
 
@@ -430,6 +431,8 @@ function DecryptPageInner() {
           Reveal your encrypted ERC7984 balance using EIP-712 user decryption.
         </p>
       </div>
+
+      <NetworkGuard />
 
       <div className="rounded-xl border border-amber-400/20 bg-amber-400/5 p-4 flex items-start gap-3">
         <Info className="h-4 w-4 text-amber-400 shrink-0 mt-0.5" />

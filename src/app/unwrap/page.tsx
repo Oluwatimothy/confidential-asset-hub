@@ -21,6 +21,7 @@ import { useRegistry } from '@/hooks/use-registry';
 import { useNetwork } from '@/hooks/use-network';
 import { formatTokenAmount, parseContractError, getTxUrl } from '@/utils';
 import { ConnectButton } from '@rainbow-me/rainbowkit';
+import { NetworkGuard } from '@/components/NetworkGuard';
 import { parseUnits } from 'viem';
 import type { RegistryPair } from '@/types';
 import type { Address } from 'viem';
@@ -38,16 +39,30 @@ type UnwrapStatus =
   | 'success'
   | 'error';
 
-function UnwrapForm({ pair }: { pair: RegistryPair }) {
+function UnwrapForm({
+  pair,
+  initialUnwrapRequestId,
+  initialUnwrapTxHash,
+  initialAmount,
+}: {
+  pair: RegistryPair;
+  initialUnwrapRequestId?: `0x${string}`;
+  initialUnwrapTxHash?: string;
+  initialAmount?: string;
+}) {
   const { address } = useAccount();
   const { chainId } = useNetwork();
-  const [amount, setAmount] = useState('');
+  const [amount, setAmount] = useState(initialAmount ?? '');
   const [amountError, setAmountError] = useState('');
-  const [status, setStatus] = useState<UnwrapStatus>('idle');
+  const [status, setStatus] = useState<UnwrapStatus>(
+    initialUnwrapRequestId ? 'awaiting-finalize' : 'idle',
+  );
   const [errorMsg, setErrorMsg] = useState('');
-  const [unwrapTxHash, setUnwrapTxHash] = useState<string | undefined>();
+  const [unwrapTxHash, setUnwrapTxHash] = useState<string | undefined>(initialUnwrapTxHash);
   const [finalizeTxHash, setFinalizeTxHash] = useState<string | undefined>();
-  const [unwrapRequestId, setUnwrapRequestId] = useState<`0x${string}` | undefined>();
+  const [unwrapRequestId, setUnwrapRequestId] = useState<`0x${string}` | undefined>(
+    initialUnwrapRequestId,
+  );
 
   // Permit + balance
   const { data: hasPermit, refetch: recheckPermit } = useHasPermit({
@@ -66,7 +81,7 @@ function UnwrapForm({ pair }: { pair: RegistryPair }) {
 
   // Step 2 — finalize
   const finalizeUnwrap = useFinalizeUnwrap(pair.confidentialToken.address);
-  const { addTx } = useTxStore();
+  const { addTx, updateTx } = useTxStore();
 
   async function handleDecryptBalance() {
     try {
@@ -103,13 +118,26 @@ function UnwrapForm({ pair }: { pair: RegistryPair }) {
 
       // Extract unwrapRequestId from receipt logs
       const event = findUnwrapRequested(result.receipt.logs);
-      if (event?.unwrapRequestId) {
-        setUnwrapRequestId(event.unwrapRequestId as `0x${string}`);
-        setStatus('awaiting-finalize');
-      } else {
-        // If no event found, try to finalize anyway
-        setStatus('awaiting-finalize');
-      }
+      const requestId = event?.unwrapRequestId as `0x${string}` | undefined;
+      if (requestId) setUnwrapRequestId(requestId);
+
+      // Your encrypted balance is already burned on-chain at this point,
+      // regardless of what happens next. Persist it now, not on finalize,
+      // so a closed tab or a cancelled finalize doesn't strand the request
+      // with no record anywhere that it exists.
+      addTx({
+        hash: result.txHash,
+        type: 'unwrap',
+        status: 'pending',
+        timestamp: Date.now(),
+        tokenSymbol: pair.confidentialToken.symbol,
+        amount,
+        chainId,
+        unwrapRequestId: requestId,
+        pairAddress: pair.confidentialToken.address,
+      });
+
+      setStatus('awaiting-finalize');
     } catch (err) {
       const msg = parseContractError(err);
       if (msg.includes('rejected')) {
@@ -132,15 +160,9 @@ function UnwrapForm({ pair }: { pair: RegistryPair }) {
         unwrapRequestId,
       });
       setFinalizeTxHash(result.txHash);
-      addTx({
-        hash: result.txHash,
-        type: 'unwrap',
-        status: 'confirmed',
-        timestamp: Date.now(),
-        tokenSymbol: pair.confidentialToken.symbol,
-        amount,
-        chainId,
-      });
+      if (unwrapTxHash) {
+        updateTx(unwrapTxHash, { status: 'confirmed' });
+      }
       setStatus('success');
     } catch (err) {
       const msg = parseContractError(err);
@@ -356,12 +378,30 @@ function UnwrapPageInner() {
   const { pairs } = useRegistry();
   const searchParams = useSearchParams();
   const presetToken = searchParams.get('token') as Address | null;
+  const records = useTxStore((s) => s.records);
 
   const validPairs = pairs.filter(
     (p) => p.isValid && Number(p.chainId) === Number(chainId),
   );
   const [selectedPair, setSelectedPair] = useState<RegistryPair | null>(null);
   const [formKey, setFormKey] = useState(0);
+  const [resumeInfo, setResumeInfo] = useState<
+    { unwrapRequestId?: `0x${string}`; unwrapTxHash?: string; amount?: string } | undefined
+  >();
+
+  const pendingUnwraps = records.filter(
+    (r) => r.type === 'unwrap' && r.status === 'pending' && Number(r.chainId) === Number(chainId),
+  );
+
+  function handleResume(record: typeof pendingUnwraps[number]) {
+    const pair = validPairs.find(
+      (p) => p.confidentialToken.address.toLowerCase() === record.pairAddress?.toLowerCase(),
+    );
+    if (!pair) return;
+    setSelectedPair(pair);
+    setResumeInfo({ unwrapRequestId: record.unwrapRequestId, unwrapTxHash: record.hash, amount: record.amount });
+    setFormKey((k) => k + 1);
+  }
 
   useEffect(() => {
     if (presetToken && validPairs.length > 0 && !selectedPair) {
@@ -390,6 +430,8 @@ function UnwrapPageInner() {
         </p>
       </div>
 
+      <NetworkGuard />
+
       <div className="rounded-xl border border-amber-400/20 bg-amber-400/5 p-4 flex items-start gap-3">
         <Info className="h-4 w-4 text-amber-400 shrink-0 mt-0.5" />
         <div className="text-xs text-zinc-400 leading-relaxed space-y-1">
@@ -398,6 +440,51 @@ function UnwrapPageInner() {
           <p><strong className="text-zinc-300">Step 2:</strong> Finalize — after the Zama network decrypts the amount, click Finalize to receive your ERC20.</p>
         </div>
       </div>
+
+      {pendingUnwraps.length > 0 && (
+        <Card>
+          <CardHeader className="pb-3">
+            <CardTitle className="text-base">Pending Unwraps</CardTitle>
+            <CardDescription>
+              Balance already burned on-chain, waiting on finalize. Safe to resume anytime.
+            </CardDescription>
+          </CardHeader>
+          <CardContent className="pt-0 space-y-2">
+            {pendingUnwraps.map((record) => {
+              const pair = validPairs.find(
+                (p) => p.confidentialToken.address.toLowerCase() === record.pairAddress?.toLowerCase(),
+              );
+              return (
+                <div
+                  key={record.hash}
+                  className="flex items-center justify-between gap-3 rounded-lg border border-amber-400/20 bg-amber-400/5 p-3"
+                >
+                  <div className="min-w-0">
+                    <p className="text-sm font-medium text-zinc-200">
+                      {record.amount} {record.tokenSymbol}
+                    </p>
+                    <a
+                      href={getTxUrl(record.hash, chainId)}
+                      target="_blank"
+                      rel="noopener noreferrer"
+                      className="text-xs text-zinc-500 hover:text-amber-400 flex items-center gap-1 mt-0.5"
+                    >
+                      View unwrap tx <ExternalLink className="h-3 w-3" />
+                    </a>
+                  </div>
+                  <Button
+                    size="sm"
+                    onClick={() => handleResume(record)}
+                    disabled={!pair}
+                  >
+                    {pair ? 'Resume Finalize' : 'Pair not found'}
+                  </Button>
+                </div>
+              );
+            })}
+          </CardContent>
+        </Card>
+      )}
 
       <Card>
         <CardHeader className="pb-3">
@@ -411,7 +498,7 @@ function UnwrapPageInner() {
             validPairs.map((pair, i) => (
               <button
                 key={i}
-                onClick={() => { setSelectedPair(pair); setFormKey((k) => k + 1); }}
+                onClick={() => { setSelectedPair(pair); setResumeInfo(undefined); setFormKey((k) => k + 1); }}
                 className={`w-full flex items-center gap-3 rounded-xl border p-3 text-left transition-all ${selectedPair?.confidentialToken.address === pair.confidentialToken.address
                   ? 'border-amber-400/50 bg-amber-400/5'
                   : 'border-zinc-800 hover:border-zinc-700 hover:bg-zinc-900'
@@ -432,7 +519,15 @@ function UnwrapPageInner() {
         </CardContent>
       </Card>
 
-      {selectedPair && <UnwrapForm key={formKey} pair={selectedPair} />}
+      {selectedPair && (
+        <UnwrapForm
+          key={formKey}
+          pair={selectedPair}
+          initialUnwrapRequestId={resumeInfo?.unwrapRequestId}
+          initialUnwrapTxHash={resumeInfo?.unwrapTxHash}
+          initialAmount={resumeInfo?.amount}
+        />
+      )}
     </div>
   );
 }

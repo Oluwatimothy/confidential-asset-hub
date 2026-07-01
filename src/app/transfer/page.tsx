@@ -18,6 +18,7 @@ import { useRegistry } from '@/hooks/use-registry';
 import { useNetwork } from '@/hooks/use-network';
 import { formatTokenAmount, isValidAddress, parseContractError, getTxUrl } from '@/utils';
 import { ConnectButton } from '@rainbow-me/rainbowkit';
+import { NetworkGuard } from '@/components/NetworkGuard';
 import { parseUnits } from 'viem';
 import type { RegistryPair } from '@/types';
 import type { Address } from 'viem';
@@ -313,6 +314,8 @@ function TransferPageInner() {
           Send an ERC-7984 confidential balance to another address — amount and balance stay encrypted onchain.
         </p>
       </div>
+
+      <NetworkGuard />
 
       <div className="rounded-xl border border-amber-400/20 bg-amber-400/5 p-4 flex items-start gap-3">
         <Info className="h-4 w-4 text-amber-400 shrink-0 mt-0.5" />

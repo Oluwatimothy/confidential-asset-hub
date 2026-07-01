@@ -8,10 +8,11 @@ import { motion } from 'framer-motion';
 import { useAccount } from 'wagmi';
 import {
   Zap, BookOpen, ArrowUpCircle, ArrowDownCircle,
-  Lock, RefreshCw, Activity, Clock, AlertCircle,
+  Lock, RefreshCw, Activity, Clock,
   Layers, Shield,
 } from 'lucide-react';
 import Link from 'next/link';
+import { NetworkGuard } from '@/components/NetworkGuard';
 import {
   Card, CardContent, CardHeader, CardTitle, CardDescription,
   Badge, Button, Skeleton, StatusDot,
@@ -144,20 +145,10 @@ export default function DashboardPage() {
         </div>
       </motion.div>
 
-      {/* Unsupported network warning */}
-      {!isSupported && isConnected && (
-        <motion.div
-          initial={{ opacity: 0 }}
-          animate={{ opacity: 1 }}
-          className="flex items-center gap-3 rounded-xl border border-red-500/30 bg-red-500/5 p-4"
-        >
-          <AlertCircle className="h-5 w-5 text-red-400 shrink-0" />
-          <div>
-            <p className="text-sm font-medium text-red-400">Unsupported network</p>
-            <p className="text-xs text-zinc-500 mt-0.5">
-              Please switch to Ethereum Mainnet or Sepolia testnet.
-            </p>
-          </div>
+      {/* Wrong / unsupported network warning */}
+      {isConnected && (
+        <motion.div initial={{ opacity: 0 }} animate={{ opacity: 1 }}>
+          <NetworkGuard />
         </motion.div>
       )}
 

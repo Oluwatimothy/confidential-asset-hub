@@ -154,6 +154,10 @@ export interface TxRecord {
   tokenSymbol: string;
   amount?: string;
   chainId: SupportedChainId;
+  /** Set on unwrap records only, needed to resume a not-yet-finalized unwrap. */
+  unwrapRequestId?: `0x${string}`;
+  /** ERC7984 wrapper address, needed to re-select the correct pair on resume. */
+  pairAddress?: Address;
 }
 
 // ── Analytics ────────────────────────────────────────────────
