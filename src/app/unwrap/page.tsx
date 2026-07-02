@@ -154,6 +154,7 @@ function UnwrapForm({
       setErrorMsg('No unwrap request ID found. Check Etherscan for the request ID.');
       return;
     }
+    setErrorMsg('');
     setStatus('finalizing');
     try {
       const result = await finalizeUnwrap.mutateAsync({
@@ -165,13 +166,20 @@ function UnwrapForm({
       }
       setStatus('success');
     } catch (err) {
+      console.error('[finalize] failed:', err);
       const msg = parseContractError(err);
-      if (msg.includes('rejected')) {
-        setStatus('awaiting-finalize');
-      } else {
-        setStatus('error');
-        setErrorMsg(msg);
-      }
+      // Finalize can only succeed once Zama's network has actually decrypted
+      // the unwrap request off-chain. Right after step 1 (or right after a
+      // resume) that may not have happened yet, so treat any finalize
+      // failure as retryable rather than a dead end: keep the request alive
+      // and stay on the Finalize button instead of bouncing back to the
+      // amount-input screen, which would risk a second, duplicate unwrap.
+      setStatus('awaiting-finalize');
+      setErrorMsg(
+        msg.includes('rejected')
+          ? ''
+          : `${msg} This can happen if the network hasn't finished decrypting the request yet. Wait a moment and try Finalize again.`
+      );
     }
   }
 
@@ -329,7 +337,7 @@ function UnwrapForm({
         )}
 
         {/* Error */}
-        {status === 'error' && errorMsg && (
+        {(status === 'error' || status === 'awaiting-finalize') && errorMsg && (
           <div className="flex items-start gap-2 rounded-xl border border-red-500/30 bg-red-500/5 p-3">
             <AlertCircle className="h-4 w-4 text-red-400 shrink-0 mt-0.5" />
             <p className="text-xs text-red-400">{errorMsg}</p>
