@@ -86,24 +86,24 @@ export const CUSTOM_PAIRS: CustomPairEntry[] = [
     notes: 'Official Sepolia testnet mock',
     addedAt: 1719360000000,
   },
-  /* {
-     token: {
-       address: '0x75355a85c6FB9df5f0C80FF54e8747EEe9a0BF57',
-       name: 'ZAMA (Mock)',
-       symbol: 'ZAMA',
-       decimals: 18,
-     },
-     confidentialToken: {
-       address: '0xf2D628d2598aF4eAF94CB76a437Ff86CA78FfbFB',
-       name: 'Confidential ZAMA (Mock)',
-       symbol: 'cZAMAMock',
-       decimals: 6,
-     },
-     rate: 1_000_000_000_000n,
-     chainId: CHAIN_IDS.SEPOLIA,
-     notes: 'Official Sepolia testnet mock',
-     addedAt: 1719360000000,
-   },*/
+  {
+    token: {
+      address: '0x75355a85c6FB9df5f0C80FF54e8747EEe9a0BF57',
+      name: 'ZAMA (Mock)',
+      symbol: 'ZAMA',
+      decimals: 18,
+    },
+    confidentialToken: {
+      address: '0xf2D628d2598aF4eAF94CB76a437Ff86CA78FfbFB',
+      name: 'Confidential ZAMA (Mock)',
+      symbol: 'cZAMAMock',
+      decimals: 6,
+    },
+    rate: 1_000_000_000_000n,
+    chainId: CHAIN_IDS.SEPOLIA,
+    notes: 'Official Sepolia testnet mock',
+    addedAt: 1719360000000,
+  },
   {
     token: {
       address: '0x93c931278A2aad1916783F952f94276eA5111442',
@@ -157,6 +157,24 @@ export const CUSTOM_PAIRS: CustomPairEntry[] = [
     chainId: CHAIN_IDS.SEPOLIA,
     notes: 'Official Sepolia testnet — restricted mint',
     addedAt: 1719360000000,
+  },
+  {
+    token: {
+      address: '0x5E1ED5F174Bd4De320C48d2E849e36266bf6cA85',
+      name: 'might',
+      symbol: 'myt',
+      decimals: 6,
+    },
+    confidentialToken: {
+      address: '0x5E1ED5F174Bd4De320C48d2E849e36266bf6cA85',
+      name: 'Confidential might',
+      symbol: 'cmyt',
+      decimals: 6,
+    },
+    rate: 1n,
+    chainId: 11155111,
+    notes: '',
+    addedAt: 1783012190421,
   },
 ];
 
