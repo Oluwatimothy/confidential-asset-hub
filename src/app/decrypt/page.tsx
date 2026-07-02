@@ -343,9 +343,17 @@ function PasteDecrypt() {
               {displayBalance !== undefined && (
                 <div className="flex justify-between text-zinc-400">
                   <span>Balance</span>
-                  <span className="text-emerald-400 font-data font-semibold">
-                    {displayBalance}
-                  </span>
+                  <div className="text-right">
+                    <span className="text-emerald-400 font-data font-semibold">
+                      {displayBalance} {resolvedSymbol !== 'TOKEN' ? resolvedSymbol : ''}
+                    </span>
+                    {decryptedBalance !== undefined && decryptedBalance < 10n ** BigInt(resolvedDecimals) && (
+                      <p className="text-[10px] text-zinc-600 mt-0.5">
+                        {decryptedBalance.toString()} raw units (ERC7984 always uses 6 decimals,
+                        this is a genuinely decrypted value, not a failed read)
+                      </p>
+                    )}
+                  </div>
                 </div>
               )}
             </div>
