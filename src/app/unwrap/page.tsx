@@ -63,6 +63,9 @@ function UnwrapForm({
   const [unwrapRequestId, setUnwrapRequestId] = useState<`0x${string}` | undefined>(
     initialUnwrapRequestId,
   );
+  const [showManualResume, setShowManualResume] = useState(false);
+  const [manualRequestId, setManualRequestId] = useState('');
+  const [manualError, setManualError] = useState('');
 
   // Permit + balance
   const { data: hasPermit, refetch: recheckPermit } = useHasPermit({
@@ -183,6 +186,20 @@ function UnwrapForm({
     }
   }
 
+  function handleLoadManualRequestId() {
+    const trimmed = manualRequestId.trim();
+    if (!/^0x[0-9a-fA-F]{64}$/.test(trimmed)) {
+      setManualError('Not a valid request ID. It should look like a 0x-prefixed 32-byte hex value, copy it from the UnwrapRequested event on Etherscan.');
+      return;
+    }
+    setManualError('');
+    setUnwrapRequestId(trimmed as `0x${string}`);
+    setUnwrapTxHash(undefined);
+    setErrorMsg('');
+    setStatus('awaiting-finalize');
+    setShowManualResume(false);
+  }
+
   function handleReset() {
     setStatus('idle');
     setErrorMsg('');
@@ -218,6 +235,39 @@ function UnwrapForm({
           <Button variant="outline" className="w-full" onClick={() => refetchBalance()} isLoading={balanceLoading}>
             Refresh Balance
           </Button>
+        )}
+
+        {/* Manual recovery, for requests our own tracking never saw
+            (e.g. page was reloaded before a signature resolved) */}
+        {(status === 'idle' || status === 'error') && (
+          <div>
+            <button
+              type="button"
+              onClick={() => setShowManualResume((v) => !v)}
+              className="text-xs text-zinc-500 hover:text-amber-400 underline underline-offset-2"
+            >
+              Already have an unwrap request ID for this token?
+            </button>
+            {showManualResume && (
+              <div className="mt-2 space-y-1.5">
+                <Label>Unwrap request ID</Label>
+                <Input
+                  placeholder="0x…"
+                  value={manualRequestId}
+                  onChange={(e) => { setManualRequestId(e.target.value); setManualError(''); }}
+                  error={manualError}
+                  className="font-data"
+                />
+                <p className="text-[10px] text-zinc-600">
+                  Find this on Etherscan: open your unwrap transaction, Logs tab,
+                  the UnwrapRequested event's unwrapRequestId field.
+                </p>
+                <Button size="sm" variant="outline" onClick={handleLoadManualRequestId}>
+                  Load and Finalize
+                </Button>
+              </div>
+            )}
+          </div>
         )}
 
         {/* Amount input — only when idle or error */}
