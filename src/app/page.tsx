@@ -3,13 +3,13 @@
 // ============================================================
 'use client';
 
-import React from 'react';
+import React, { useState } from 'react';
 import { motion } from 'framer-motion';
 import { useAccount } from 'wagmi';
 import {
   Zap, BookOpen, ArrowUpCircle, ArrowDownCircle,
   Lock, RefreshCw, Activity, Clock,
-  Layers, Shield,
+  Layers, Shield, X,
 } from 'lucide-react';
 import Link from 'next/link';
 import { NetworkGuard } from '@/components/NetworkGuard';
@@ -101,6 +101,7 @@ export default function DashboardPage() {
   const { pairs, isLoading: registryLoading, lastSyncedAt, isSyncing } = useRegistry();
   const { entries, isLoading: portfolioLoading } = usePortfolio();
   const records = useTxStore((s) => s.records);
+  const [showEthCallout, setShowEthCallout] = useState(true);
 
   const validPairs = pairs.filter((p) => p.isValid).length;
   const officialPairs = pairs.filter((p) => p.source === 'official').length;
@@ -149,6 +150,34 @@ export default function DashboardPage() {
       {isConnected && (
         <motion.div initial={{ opacity: 0 }} animate={{ opacity: 1 }}>
           <NetworkGuard />
+        </motion.div>
+      )}
+
+      {/* Sepolia ETH callout, for first-time visitors with nothing to pay gas with */}
+      {isConnected && showEthCallout && (
+        <motion.div
+          initial={{ opacity: 0 }}
+          animate={{ opacity: 1 }}
+          className="flex items-center justify-between gap-3 rounded-xl border border-zinc-800 bg-zinc-900/50 px-4 py-2.5 text-xs"
+        >
+          <span className="text-zinc-400">
+            Don't have Sepolia ETH to cover gas?{' '}
+            <a
+              href="https://cloud.google.com/application/web3/faucet/ethereum/sepolia"
+              target="_blank"
+              rel="noopener noreferrer"
+              className="text-amber-400 hover:underline font-medium"
+            >
+              Claim some free from Google Cloud
+            </a>
+          </span>
+          <button
+            onClick={() => setShowEthCallout(false)}
+            className="text-zinc-600 hover:text-zinc-400 shrink-0"
+            aria-label="Dismiss"
+          >
+            <X className="h-3.5 w-3.5" />
+          </button>
         </motion.div>
       )}
 
