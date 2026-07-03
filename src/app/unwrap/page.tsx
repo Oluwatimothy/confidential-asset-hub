@@ -18,6 +18,7 @@ import {
 import { useTxStore } from '@/stores';
 import { findUnwrapRequested } from '@zama-fhe/sdk';
 import { useRegistry } from '@/hooks/use-registry';
+import { getPublicClient } from '@/services/registry';
 import { useOnChainPendingUnwraps } from '@/hooks/use-onchain-pending-unwraps';
 import { useNetwork } from '@/hooks/use-network';
 import { formatTokenAmount, parseContractError, getTxUrl } from '@/utils';
@@ -65,8 +66,9 @@ function UnwrapForm({
     initialUnwrapRequestId,
   );
   const [showManualResume, setShowManualResume] = useState(false);
-  const [manualRequestId, setManualRequestId] = useState('');
+  const [manualTxHash, setManualTxHash] = useState('');
   const [manualError, setManualError] = useState('');
+  const [manualLoading, setManualLoading] = useState(false);
 
   // Permit + balance
   const { data: hasPermit, refetch: recheckPermit } = useHasPermit({
@@ -187,18 +189,36 @@ function UnwrapForm({
     }
   }
 
-  function handleLoadManualRequestId() {
-    const trimmed = manualRequestId.trim();
+  async function handleLoadFromTxHash() {
+    const trimmed = manualTxHash.trim();
     if (!/^0x[0-9a-fA-F]{64}$/.test(trimmed)) {
-      setManualError('Not a valid request ID. It should look like a 0x-prefixed 32-byte hex value, copy it from the UnwrapRequested event on Etherscan.');
+      setManualError('That doesn\'t look like a transaction hash. It should be a 0x-prefixed value, copy it from your wallet\'s activity, or from the transaction URL on Etherscan.');
       return;
     }
     setManualError('');
-    setUnwrapRequestId(trimmed as `0x${string}`);
-    setUnwrapTxHash(undefined);
-    setErrorMsg('');
-    setStatus('awaiting-finalize');
-    setShowManualResume(false);
+    setManualLoading(true);
+    try {
+      const client = getPublicClient(chainId);
+      const receipt = await client.getTransactionReceipt({ hash: trimmed as `0x${string}` });
+      const event = findUnwrapRequested(receipt.logs);
+      const requestId = event?.unwrapRequestId as `0x${string}` | undefined;
+
+      if (!requestId) {
+        setManualError('No UnwrapRequested event found in that transaction. Make sure this is the unwrap transaction for ' + pair.confidentialToken.symbol + ', not the finalize transaction or a different token.');
+        setManualLoading(false);
+        return;
+      }
+
+      setUnwrapRequestId(requestId);
+      setUnwrapTxHash(trimmed);
+      setErrorMsg('');
+      setStatus('awaiting-finalize');
+      setShowManualResume(false);
+    } catch {
+      setManualError('Could not find that transaction. Double check the hash and that your wallet is on the same network the transaction was sent on.');
+    } finally {
+      setManualLoading(false);
+    }
   }
 
   function handleReset() {
@@ -247,24 +267,24 @@ function UnwrapForm({
               onClick={() => setShowManualResume((v) => !v)}
               className="text-xs text-zinc-500 hover:text-amber-400 underline underline-offset-2"
             >
-              Already have an unwrap request ID for this token?
+              Have an unfinalized unwrap? Paste transaction hash to finalize
             </button>
             {showManualResume && (
               <div className="mt-2 space-y-1.5">
-                <Label>Unwrap request ID</Label>
+                <Label>Unwrap transaction hash</Label>
                 <Input
                   placeholder="0x…"
-                  value={manualRequestId}
-                  onChange={(e) => { setManualRequestId(e.target.value); setManualError(''); }}
+                  value={manualTxHash}
+                  onChange={(e) => { setManualTxHash(e.target.value); setManualError(''); }}
                   error={manualError}
                   className="font-data"
                 />
                 <p className="text-[10px] text-zinc-600">
-                  Find this on Etherscan: open your unwrap transaction, Logs tab,
-                  the UnwrapRequested event's unwrapRequestId field.
+                  Paste the hash of your unwrap transaction, from your wallet's activity
+                  or from an Etherscan link. The request ID is read from it automatically.
                 </p>
-                <Button size="sm" variant="outline" onClick={handleLoadManualRequestId}>
-                  Load and Finalize
+                <Button size="sm" variant="outline" onClick={handleLoadFromTxHash} isLoading={manualLoading} disabled={manualLoading}>
+                  {manualLoading ? 'Looking up…' : 'Load and Finalize'}
                 </Button>
               </div>
             )}
