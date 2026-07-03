@@ -18,6 +18,7 @@ import {
 import { useTxStore } from '@/stores';
 import { findUnwrapRequested } from '@zama-fhe/sdk';
 import { useRegistry } from '@/hooks/use-registry';
+import { useOnChainPendingUnwraps } from '@/hooks/use-onchain-pending-unwraps';
 import { useNetwork } from '@/hooks/use-network';
 import { formatTokenAmount, parseContractError, getTxUrl } from '@/utils';
 import { ConnectButton } from '@rainbow-me/rainbowkit';
@@ -431,7 +432,7 @@ function UnwrapForm({
 }
 
 function UnwrapPageInner() {
-  const { isConnected } = useAccount();
+  const { isConnected, address: connectedAddress } = useAccount();
   const { chainId } = useNetwork();
   const { pairs } = useRegistry();
   const searchParams = useSearchParams();
@@ -447,9 +448,35 @@ function UnwrapPageInner() {
     { unwrapRequestId?: `0x${string}`; unwrapTxHash?: string; amount?: string } | undefined
   >();
 
-  const pendingUnwraps = records.filter(
+  const localPendingUnwraps = records.filter(
     (r) => r.type === 'unwrap' && r.status === 'pending' && Number(r.chainId) === Number(chainId),
   );
+
+  const { data: onChainFound = [] } = useOnChainPendingUnwraps(
+    connectedAddress,
+    validPairs,
+    chainId,
+  );
+
+  const localRequestIds = new Set(localPendingUnwraps.map((r) => r.unwrapRequestId).filter(Boolean));
+
+  // Same shape as a TxRecord so the existing card below needs no changes,
+  // just extra entries it didn't know about before.
+  const recoveredUnwraps = onChainFound
+    .filter((f) => !localRequestIds.has(f.unwrapRequestId))
+    .map((f) => ({
+      hash: f.txHash,
+      type: 'unwrap' as const,
+      status: 'pending' as const,
+      timestamp: 0,
+      tokenSymbol: f.tokenSymbol,
+      amount: undefined,
+      chainId,
+      unwrapRequestId: f.unwrapRequestId,
+      pairAddress: f.pairAddress,
+    }));
+
+  const pendingUnwraps = [...localPendingUnwraps, ...recoveredUnwraps];
 
   function handleResume(record: typeof pendingUnwraps[number]) {
     const pair = validPairs.find(
@@ -519,7 +546,7 @@ function UnwrapPageInner() {
                 >
                   <div className="min-w-0">
                     <p className="text-sm font-medium text-zinc-200">
-                      {record.amount} {record.tokenSymbol}
+                      {record.amount ?? 'Amount hidden until finalized'} {record.tokenSymbol}
                     </p>
                     <a
                       href={getTxUrl(record.hash, chainId)}

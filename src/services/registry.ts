@@ -13,7 +13,7 @@ import type { RegistryPair, TokenInfo, TokenWrapperPair, SupportedChainId } from
 import type { Address } from 'viem';
 
 // ── Client factory ────────────────────────────────────────────
-function getPublicClient(chainId: SupportedChainId): PublicClient {
+export function getPublicClient(chainId: SupportedChainId): PublicClient {
   const chain = chainId === CHAIN_IDS.MAINNET ? mainnet : sepolia;
   const network = chainId === CHAIN_IDS.MAINNET ? 'mainnet' : 'sepolia';
   const baseUrl = typeof window !== 'undefined' ? window.location.origin : 'http://localhost:3000';
