@@ -1,6 +1,6 @@
 'use client';
 
-import React, { useState, useMemo, Suspense } from 'react';
+import React, { useState, useMemo, useRef, Suspense } from 'react';
 import { useAccount } from 'wagmi';
 import { Send, CheckCircle2, AlertCircle, Info, KeyRound, ExternalLink } from 'lucide-react';
 import {
@@ -66,7 +66,7 @@ function TransferForm({ pair }: { pair: RegistryPair }) {
 
   const decryptedBalance = isRealBalance(rawBalance) ? rawBalance : undefined;
 
-  const transfer = useConfidentialTransfer({ address: contractAddress });
+  const transfer = useConfidentialTransfer({ address: contractAddress, optimistic: true });
   const { addTx } = useTxStore();
 
   async function handleGrantAndDecrypt() {
@@ -112,15 +112,26 @@ function TransferForm({ pair }: { pair: RegistryPair }) {
     return ok;
   }
 
+  const [awaitingSignature, setAwaitingSignature] = useState(false);
+  const signatureTimeoutRef = useRef<ReturnType<typeof setTimeout> | undefined>(undefined);
+
   async function handleTransfer() {
     if (!validate()) return;
     setErrorMsg('');
     setStatus('transferring');
+    setAwaitingSignature(false);
+    // FHE-encrypting the amount and generating the input proof happens
+    // client side before the wallet even opens, that's the delay you're
+    // seeing. Swap the label after a beat so it reads as progress rather
+    // than a frozen button.
+    signatureTimeoutRef.current = setTimeout(() => setAwaitingSignature(true), 1200);
     try {
       const result = await transfer.mutateAsync({
         to: recipient as Address,
         amount: parseUnits(amount, pair.confidentialToken.decimals),
       });
+      clearTimeout(signatureTimeoutRef.current);
+      setAwaitingSignature(false);
       setTransferTxHash(result.txHash);
       addTx({
         hash: result.txHash,
@@ -134,6 +145,8 @@ function TransferForm({ pair }: { pair: RegistryPair }) {
       await refetchBalance();
       setStatus('success');
     } catch (err) {
+      clearTimeout(signatureTimeoutRef.current);
+      setAwaitingSignature(false);
       const msg = parseContractError(err);
       if (msg.includes('rejected')) {
         setStatus('idle');
@@ -271,7 +284,9 @@ function TransferForm({ pair }: { pair: RegistryPair }) {
         disabled={status === 'transferring' || !address}
       >
         <Send className="h-4 w-4" />
-        {status === 'transferring' ? 'Transferring…' : `Transfer ${pair.confidentialToken.symbol}`}
+        {status === 'transferring'
+          ? (awaitingSignature ? 'Confirm in wallet…' : 'Encrypting amount…')
+          : `Transfer ${pair.confidentialToken.symbol}`}
       </Button>
     </div>
   );
