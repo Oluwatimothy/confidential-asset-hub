@@ -158,6 +158,10 @@ export interface TxRecord {
   unwrapRequestId?: `0x${string}`;
   /** ERC7984 wrapper address, needed to re-select the correct pair on resume. */
   pairAddress?: Address;
+  /** Wallet that owns this record. Without this, records from one wallet
+   *  would appear (and be resumable) under any other wallet connected in
+   *  the same browser, since localStorage isn't wallet-scoped on its own. */
+  walletAddress?: Address;
 }
 
 // ── Analytics ────────────────────────────────────────────────

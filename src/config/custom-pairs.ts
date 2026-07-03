@@ -158,24 +158,6 @@ export const CUSTOM_PAIRS: CustomPairEntry[] = [
     notes: 'Official Sepolia testnet — restricted mint',
     addedAt: 1719360000000,
   },
-  {
-    token: {
-      address: '0x56D6Eb50238D3D936Fed41D9a60698b887D6b8A8',
-      name: 'TIM',
-      symbol: 'TIM',
-      decimals: 6,
-    },
-    confidentialToken: {
-      address: '0x44e326E67046b86FC2ad7b98902c03FaAFdaeca4',
-      name: 'Confidential TIM',
-      symbol: 'cTIM',
-      decimals: 6,
-    },
-    rate: 1n,
-    chainId: 11155111,
-    notes: '',
-    addedAt: 1783108819434,
-  },
 ];
 
 export function buildCustomRegistryPairs(): RegistryPair[] {

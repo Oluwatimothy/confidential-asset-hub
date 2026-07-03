@@ -19,6 +19,7 @@ import { useNetwork } from '@/hooks/use-network';
 import { formatTokenAmount, isValidAddress, parseContractError, getTxUrl } from '@/utils';
 import { ConnectButton } from '@rainbow-me/rainbowkit';
 import { NetworkGuard } from '@/components/NetworkGuard';
+import { BalanceLabel } from '@/components/BalanceLabel';
 import { parseUnits } from 'viem';
 import type { RegistryPair } from '@/types';
 import type { Address } from 'viem';
@@ -209,11 +210,12 @@ function TransferForm({ pair }: { pair: RegistryPair }) {
     <div className="space-y-4">
       <div className="flex items-center justify-between text-xs text-zinc-500">
         <span>Decrypted balance</span>
-        <span className="font-data text-emerald-400 font-semibold">
-          {decryptedBalance !== undefined
-            ? `${formatTokenAmount(decryptedBalance, pair.confidentialToken.decimals)} ${pair.confidentialToken.symbol}`
-            : '—'}
-        </span>
+        <BalanceLabel
+          raw={decryptedBalance}
+          decimals={pair.confidentialToken.decimals}
+          symbol={pair.confidentialToken.symbol}
+          className="font-data text-emerald-400 font-semibold text-right"
+        />
       </div>
 
       <div className="space-y-1.5">

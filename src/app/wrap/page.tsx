@@ -15,6 +15,7 @@ import { useNetwork } from '@/hooks/use-network';
 import { formatTokenAmount, parseContractError, getTxUrl } from '@/utils';
 import { ERC20_ABI } from '@/contracts/erc20-abi';
 import { NetworkGuard } from '@/components/NetworkGuard';
+import { BalanceLabel } from '@/components/BalanceLabel';
 import { ConnectButton } from '@rainbow-me/rainbowkit';
 import { parseUnits, formatUnits } from 'viem';
 import type { RegistryPair } from '@/types';
@@ -183,10 +184,6 @@ function WrapForm({ pair, onReset }: { pair: RegistryPair; onReset: () => void }
     onReset();
   }
 
-  const formattedBalance = tokenBalance !== undefined
-    ? formatTokenAmount(tokenBalance as bigint, pair.token.decimals)
-    : '—';
-
   // What you receive — account for rate
   const receiveAmount = (() => {
     if (!amount || parseFloat(amount) <= 0) return '—';
@@ -209,9 +206,12 @@ function WrapForm({ pair, onReset }: { pair: RegistryPair; onReset: () => void }
         </CardTitle>
         <CardDescription>
           Balance:{' '}
-          <span className="text-zinc-200 font-medium">
-            {formattedBalance} {pair.token.symbol}
-          </span>
+          <BalanceLabel
+            raw={tokenBalance as bigint | undefined}
+            decimals={pair.token.decimals}
+            symbol={pair.token.symbol}
+            className="text-zinc-200 font-medium"
+          />
           {allowance !== undefined && allowance > 0n && (
             <span className="ml-3 text-zinc-600 text-xs">
               approved: {formatTokenAmount(allowance, pair.token.decimals)}

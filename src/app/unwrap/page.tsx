@@ -24,6 +24,7 @@ import { useNetwork } from '@/hooks/use-network';
 import { formatTokenAmount, parseContractError, getTxUrl } from '@/utils';
 import { ConnectButton } from '@rainbow-me/rainbowkit';
 import { NetworkGuard } from '@/components/NetworkGuard';
+import { BalanceLabel } from '@/components/BalanceLabel';
 import { parseUnits } from 'viem';
 import type { RegistryPair } from '@/types';
 import type { Address } from 'viem';
@@ -141,6 +142,7 @@ function UnwrapForm({
         chainId,
         unwrapRequestId: requestId,
         pairAddress: pair.confidentialToken.address,
+        walletAddress: address,
       });
 
       setStatus('awaiting-finalize');
@@ -209,6 +211,13 @@ function UnwrapForm({
         return;
       }
 
+      const receiver = (event as unknown as { receiver?: `0x${string}` })?.receiver;
+      if (!address || !receiver || receiver.toLowerCase() !== address.toLowerCase()) {
+        setManualError('This unwrap request belongs to a different wallet than the one currently connected. Connect the wallet that originally submitted the unwrap to finalize it.');
+        setManualLoading(false);
+        return;
+      }
+
       setUnwrapRequestId(requestId);
       setUnwrapTxHash(trimmed);
       setErrorMsg('');
@@ -240,7 +249,7 @@ function UnwrapForm({
         </CardTitle>
         <CardDescription>
           {decryptedBalance !== undefined
-            ? <>Available: <span className="text-zinc-200 font-medium">{formatTokenAmount(decryptedBalance, pair.confidentialToken.decimals)} {pair.confidentialToken.symbol}</span></>
+            ? <>Available: <BalanceLabel raw={decryptedBalance} decimals={pair.confidentialToken.decimals} symbol={pair.confidentialToken.symbol} className="text-zinc-200 font-medium" /></>
             : 'Sign permit to see your balance'}
         </CardDescription>
       </CardHeader>
@@ -469,7 +478,11 @@ function UnwrapPageInner() {
   >();
 
   const localPendingUnwraps = records.filter(
-    (r) => r.type === 'unwrap' && r.status === 'pending' && Number(r.chainId) === Number(chainId),
+    (r) =>
+      r.type === 'unwrap' &&
+      r.status === 'pending' &&
+      Number(r.chainId) === Number(chainId) &&
+      r.walletAddress?.toLowerCase() === connectedAddress?.toLowerCase(),
   );
 
   const { data: onChainFound = [] } = useOnChainPendingUnwraps(

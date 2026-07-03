@@ -9,6 +9,7 @@ import { ZamaProvider } from '@zama-fhe/react-sdk';
 import { createConfig as createZamaConfig } from '@zama-fhe/react-sdk/wagmi';
 import { web } from '@zama-fhe/sdk/web';
 import { sepolia, mainnet } from '@zama-fhe/sdk/chains';
+import { IdleDisconnect } from '@/components/IdleDisconnect';
 
 import '@rainbow-me/rainbowkit/styles.css';
 
@@ -63,6 +64,7 @@ export function Providers({ children }: { children: React.ReactNode }) {
         <RainbowKitProvider theme={rainbowTheme} initialChain={11155111}>
           <ZamaProvider config={zamaConfig}>
             {children}
+            <IdleDisconnect />
           </ZamaProvider>
         </RainbowKitProvider>
       </QueryClientProvider>
