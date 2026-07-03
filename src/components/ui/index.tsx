@@ -19,17 +19,17 @@ const buttonVariants = cva(
   {
     variants: {
       variant: {
-        default:     'bg-amber-400 text-zinc-950 hover:bg-amber-300 active:bg-amber-500 shadow-sm',
-        secondary:   'bg-zinc-800 text-zinc-100 hover:bg-zinc-700 border border-zinc-700',
-        outline:     'border border-zinc-700 text-zinc-300 hover:bg-zinc-800 hover:text-zinc-100',
-        ghost:       'text-zinc-400 hover:bg-zinc-800 hover:text-zinc-100',
+        default: 'bg-amber-400 text-zinc-950 hover:bg-amber-300 active:bg-amber-500 shadow-sm',
+        secondary: 'bg-zinc-800 text-zinc-100 hover:bg-zinc-700 border border-zinc-700',
+        outline: 'border border-zinc-700 text-zinc-300 hover:bg-zinc-800 hover:text-zinc-100',
+        ghost: 'text-zinc-400 hover:bg-zinc-800 hover:text-zinc-100',
         destructive: 'bg-red-600 text-white hover:bg-red-500',
-        link:        'text-amber-400 underline-offset-4 hover:underline p-0 h-auto',
+        link: 'text-amber-400 underline-offset-4 hover:underline p-0 h-auto',
       },
       size: {
-        sm:   'h-8 px-3 text-xs rounded-md',
-        md:   'h-10 px-4',
-        lg:   'h-12 px-6 text-base',
+        sm: 'h-8 px-3 text-xs rounded-md',
+        md: 'h-10 px-4',
+        lg: 'h-12 px-6 text-base',
         icon: 'h-9 w-9',
       },
     },
@@ -39,7 +39,7 @@ const buttonVariants = cva(
 
 export interface ButtonProps
   extends React.ButtonHTMLAttributes<HTMLButtonElement>,
-    VariantProps<typeof buttonVariants> {
+  VariantProps<typeof buttonVariants> {
   isLoading?: boolean;
 }
 
@@ -69,12 +69,12 @@ const badgeVariants = cva(
   {
     variants: {
       variant: {
-        default:   'border-amber-400/30 bg-amber-400/10 text-amber-300',
+        default: 'border-amber-400/30 bg-amber-400/10 text-amber-300',
         secondary: 'border-zinc-600 bg-zinc-800 text-zinc-300',
-        success:   'border-emerald-500/30 bg-emerald-500/10 text-emerald-400',
-        warning:   'border-amber-500/30 bg-amber-500/10 text-amber-400',
-        danger:    'border-red-500/30 bg-red-500/10 text-red-400',
-        outline:   'border-zinc-600 text-zinc-400',
+        success: 'border-emerald-500/30 bg-emerald-500/10 text-emerald-400',
+        warning: 'border-amber-500/30 bg-amber-500/10 text-amber-400',
+        danger: 'border-red-500/30 bg-red-500/10 text-red-400',
+        outline: 'border-zinc-600 text-zinc-400',
       },
     },
     defaultVariants: { variant: 'default' },
@@ -83,7 +83,7 @@ const badgeVariants = cva(
 
 export interface BadgeProps
   extends React.HTMLAttributes<HTMLSpanElement>,
-    VariantProps<typeof badgeVariants> {}
+  VariantProps<typeof badgeVariants> { }
 
 export function Badge({ className, variant, ...props }: BadgeProps) {
   return <span className={cn(badgeVariants({ variant }), className)} {...props} />;
@@ -133,10 +133,20 @@ export interface InputProps extends React.InputHTMLAttributes<HTMLInputElement> 
 }
 
 export const Input = React.forwardRef<HTMLInputElement, InputProps>(
-  ({ className, error, ...props }, ref) => (
+  ({ className, error, onWheel, type, ...props }, ref) => (
     <div className="w-full">
       <input
         ref={ref}
+        type={type}
+        // Number inputs respond to mouse/trackpad scroll by nudging the
+        // value up or down while focused, an easy-to-trigger browser
+        // quirk that silently changes what someone typed. Blur on wheel
+        // so scrolling the page never edits a focused amount field.
+        onWheel={
+          type === 'number'
+            ? (e) => { e.currentTarget.blur(); onWheel?.(e); }
+            : onWheel
+        }
         className={cn(
           'flex h-10 w-full rounded-lg border border-zinc-700 bg-zinc-800/50 px-3 py-2 text-sm text-zinc-100 placeholder:text-zinc-500 focus:outline-none focus:ring-2 focus:ring-amber-400 focus:border-amber-400 disabled:opacity-40 transition-colors',
           error && 'border-red-500 focus:ring-red-500',
@@ -328,9 +338,9 @@ export function StatusDot({ status }: { status: 'active' | 'warning' | 'error' |
     <span
       className={cn('inline-block h-2 w-2 rounded-full', {
         'bg-emerald-400 shadow-[0_0_6px_#34d399]': status === 'active',
-        'bg-amber-400  shadow-[0_0_6px_#fbbf24]':  status === 'warning',
-        'bg-red-500    shadow-[0_0_6px_#ef4444]':  status === 'error',
-        'bg-zinc-600':                              status === 'inactive',
+        'bg-amber-400  shadow-[0_0_6px_#fbbf24]': status === 'warning',
+        'bg-red-500    shadow-[0_0_6px_#ef4444]': status === 'error',
+        'bg-zinc-600': status === 'inactive',
       })}
     />
   );
