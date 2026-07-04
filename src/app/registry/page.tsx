@@ -14,6 +14,7 @@ import {
 import { useRegistry } from '@/hooks/use-registry';
 import { useNetwork } from '@/hooks/use-network';
 import { shortAddress, getAddressUrl } from '@/utils';
+import { TokenIcon } from '@/components/TokenIcon';
 import type { RegistryPair } from '@/types';
 
 type FilterMode = 'all' | 'official' | 'custom' | 'valid' | 'revoked';
@@ -32,9 +33,7 @@ function PairRow({ pair }: { pair: RegistryPair }) {
         <div className="flex items-center gap-3 min-w-0">
           {/* Token avatars */}
           <div className="relative shrink-0">
-            <div className="flex h-9 w-9 items-center justify-center rounded-full bg-zinc-800 text-xs font-bold text-zinc-300">
-              {pair.token.symbol.slice(0, 2)}
-            </div>
+            <TokenIcon symbol={pair.token.symbol} size={36} />
             <div className="absolute -bottom-1 -right-1 flex h-5 w-5 items-center justify-center rounded-full border border-zinc-900 bg-amber-400/20 text-[8px] font-bold text-amber-400">
               c
             </div>

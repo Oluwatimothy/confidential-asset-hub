@@ -411,11 +411,57 @@ function AllResults() {
   );
 }
 
+function DecryptAllPanel({ pairs, onSuccess }: { pairs: RegistryPair[]; onSuccess: () => void }) {
+  const { address } = useAccount();
+  const { mutateAsync: grantPermitAll, isPending: granting } = useGrantPermit();
+  const [status, setStatus] = useState<'idle' | 'success' | 'error'>('idle');
+  const [errorMsg, setErrorMsg] = useState('');
+
+  async function handleDecryptAll() {
+    if (!address || pairs.length === 0) return;
+    setStatus('idle');
+    setErrorMsg('');
+    try {
+      // One EIP-712 signature covering every registry confidential token
+      // address at once, this is the same batch-capable grantPermit already
+      // used everywhere else in the app for a single address, just given
+      // the full list instead. It does not touch or affect the individual
+      // per-token Sign Permit & Decrypt flow below in any way.
+      const addresses = pairs.map((p) => p.confidentialToken.address);
+      await grantPermitAll(addresses);
+      setStatus('success');
+      onSuccess();
+    } catch (err) {
+      setStatus('error');
+      setErrorMsg((err as Error)?.message?.slice(0, 150) ?? 'Could not decrypt all balances.');
+    }
+  }
+
+  if (pairs.length === 0) return null;
+
+  return (
+    <div className="rounded-xl border border-amber-400/20 bg-amber-400/5 p-4 flex items-center justify-between gap-3 flex-wrap">
+      <div className="text-xs text-zinc-400 min-w-0">
+        <p className="font-medium text-amber-400">Decrypt all balances</p>
+        <p className="mt-0.5">
+          One signature covers every registry token below, instead of signing once per token.
+        </p>
+        {status === 'error' && <p className="text-red-400 mt-1">{errorMsg}</p>}
+        {status === 'success' && <p className="text-emerald-400 mt-1">Signed, balances below are decrypting…</p>}
+      </div>
+      <Button size="sm" onClick={handleDecryptAll} isLoading={granting} disabled={granting}>
+        {granting ? 'Sign in wallet…' : 'Decrypt All'}
+      </Button>
+    </div>
+  );
+}
+
 function DecryptPageInner() {
   const { isConnected } = useAccount();
   const { chainId } = useNetwork();
   const { pairs } = useRegistry();
   const [mode, setMode] = useState<'registry' | 'paste'>('registry');
+  const [refreshKey, setRefreshKey] = useState(0);
 
   const activePairs = pairs.filter(
     (p) => p.isValid && Number(p.chainId) === Number(chainId),
@@ -467,18 +513,21 @@ function DecryptPageInner() {
       </div>
 
       {mode === 'registry' && (
-        <Card>
-          <CardHeader className="pb-3">
-            <CardTitle className="text-base">Your Confidential Tokens</CardTitle>
-            <CardDescription>{activePairs.length} tokens on this network</CardDescription>
-          </CardHeader>
-          <CardContent className="pt-0 space-y-2">
-            {activePairs.length === 0
-              ? <p className="text-sm text-zinc-500 text-center py-4">No pairs found — make sure you are on Sepolia.</p>
-              : activePairs.map((pair, i) => <TokenDecryptCard key={i} pair={pair} />)
-            }
-          </CardContent>
-        </Card>
+        <>
+          <DecryptAllPanel pairs={activePairs} onSuccess={() => setRefreshKey((k) => k + 1)} />
+          <Card>
+            <CardHeader className="pb-3">
+              <CardTitle className="text-base">Your Confidential Tokens</CardTitle>
+              <CardDescription>{activePairs.length} tokens on this network</CardDescription>
+            </CardHeader>
+            <CardContent className="pt-0 space-y-2">
+              {activePairs.length === 0
+                ? <p className="text-sm text-zinc-500 text-center py-4">No pairs found — make sure you are on Sepolia.</p>
+                : activePairs.map((pair, i) => <TokenDecryptCard key={`${i}-${refreshKey}`} pair={pair} />)
+              }
+            </CardContent>
+          </Card>
+        </>
       )}
 
       {mode === 'paste' && <PasteDecrypt />}

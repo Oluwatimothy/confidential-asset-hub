@@ -33,10 +33,10 @@ const schema = z.object({
     .string()
     .min(1, 'Required')
     .refine(isValidAddress, 'Not a valid Ethereum address'),
-  name: z.string().min(1, 'Required').max(64),
-  symbol: z.string().min(1, 'Required').max(16),
+  name:     z.string().min(1, 'Required').max(64),
+  symbol:   z.string().min(1, 'Required').max(16),
   decimals: z.coerce.number().int().min(0).max(18),
-  notes: z.string().max(256).optional(),
+  notes:    z.string().max(256).optional(),
 });
 
 type FormValues = z.infer<typeof schema>;
@@ -51,12 +51,13 @@ function WizardSteps({ step }: { step: WizardStep }) {
       {steps.map((s, i) => (
         <React.Fragment key={s}>
           <div
-            className={`flex h-6 w-6 items-center justify-center rounded-full text-xs font-medium transition-colors ${s === step
-              ? 'bg-amber-400 text-zinc-950'
-              : steps.indexOf(step) > i
+            className={`flex h-6 w-6 items-center justify-center rounded-full text-xs font-medium transition-colors ${
+              s === step
+                ? 'bg-amber-400 text-zinc-950'
+                : steps.indexOf(step) > i
                 ? 'bg-emerald-500/20 text-emerald-400 border border-emerald-500/30'
                 : 'bg-zinc-800 text-zinc-500'
-              }`}
+            }`}
           >
             {steps.indexOf(step) > i ? <CheckCircle2 className="h-3.5 w-3.5" /> : i + 1}
           </div>
@@ -71,7 +72,7 @@ function WizardSteps({ step }: { step: WizardStep }) {
 
 export default function AddPairPage() {
   const { chainId } = useNetwork();
-  const { pairs } = useRegistryStore();
+  const { pairs }   = useRegistryStore();
 
   const [wizardStep, setWizardStep] = useState<WizardStep>('form');
   const [pendingEntry, setPendingEntry] = useState<CustomPairEntry | null>(null);
@@ -112,21 +113,21 @@ export default function AddPairPage() {
 
     const entry: CustomPairEntry = {
       token: {
-        address: data.erc20Address as `0x${string}`,
-        name: data.name,
-        symbol: data.symbol,
+        address:  data.erc20Address as `0x${string}`,
+        name:     data.name,
+        symbol:   data.symbol,
         decimals: data.decimals,
       },
       confidentialToken: {
-        address: data.erc7984Address as `0x${string}`,
-        name: `Confidential ${data.name}`,
-        symbol: `c${data.symbol}`,
+        address:  data.erc7984Address as `0x${string}`,
+        name:     `Confidential ${data.name}`,
+        symbol:   `c${data.symbol}`,
         decimals: data.decimals,
       },
-      rate: 1n,
-      chainId: chainId as SupportedChainId,
-      notes: data.notes,
-      addedAt: Date.now(),
+      rate:     1n,
+      chainId:  chainId as SupportedChainId,
+      notes:    data.notes,
+      addedAt:  Date.now(),
     };
 
     setPendingEntry(entry);
@@ -184,17 +185,8 @@ export default function AddPairPage() {
             <p>
               Custom pairs live in <code className="font-data text-amber-400/70">src/config/custom-pairs.ts</code>{' '}
               and are merged with the official on-chain registry at build time.
-              After completing this wizard, copy the generated snippet as a new entry
-              inside the <code className="font-data text-amber-400/70">CUSTOM_PAIRS</code> array in that file,
-              not elsewhere in it.
-            </p>
-            <p>
-              If you maintain this repository: commit and push to main, Vercel redeploys
-              automatically, no manual build step needed.
-            </p>
-            <p>
-              If you don't: fork or branch, add the snippet, and open a pull request,
-              the pair goes live once a maintainer merges it.
+              After completing this wizard, copy the generated snippet into that file
+              and rebuild the app.
             </p>
           </div>
         </div>
@@ -304,12 +296,12 @@ export default function AddPairPage() {
               >
                 <div className="space-y-2">
                   {[
-                    { label: 'ERC20 Address', value: pendingEntry.token.address },
-                    { label: 'ERC7984 Address', value: pendingEntry.confidentialToken.address },
-                    { label: 'Name', value: pendingEntry.token.name },
-                    { label: 'Symbol', value: pendingEntry.token.symbol },
-                    { label: 'Decimals', value: pendingEntry.token.decimals.toString() },
-                    { label: 'Chain', value: `Chain ID ${pendingEntry.chainId}` },
+                    { label: 'ERC20 Address',   value: pendingEntry.token.address       },
+                    { label: 'ERC7984 Address',  value: pendingEntry.confidentialToken.address },
+                    { label: 'Name',             value: pendingEntry.token.name          },
+                    { label: 'Symbol',           value: pendingEntry.token.symbol        },
+                    { label: 'Decimals',         value: pendingEntry.token.decimals.toString() },
+                    { label: 'Chain',            value: `Chain ID ${pendingEntry.chainId}` },
                   ].map((row) => (
                     <div key={row.label} className="flex items-start justify-between gap-3 py-1.5 border-b border-zinc-800">
                       <span className="text-xs text-zinc-500 shrink-0 w-32">{row.label}</span>

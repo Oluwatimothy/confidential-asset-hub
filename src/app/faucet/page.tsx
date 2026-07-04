@@ -14,6 +14,7 @@ import { getFaucetTokensByChain } from '@/config/faucet-tokens';
 import { getTxUrl, formatDate, parseContractError } from '@/utils';
 import { ConnectButton } from '@rainbow-me/rainbowkit';
 import { NetworkGuard } from '@/components/NetworkGuard';
+import { TokenIcon } from '@/components/TokenIcon';
 import { parseUnits } from 'viem';
 import type { FaucetToken } from '@/types';
 
@@ -122,9 +123,7 @@ function FaucetCard({ token }: { token: FaucetToken }) {
       <CardContent className="p-5 space-y-4">
         <div className="flex items-start justify-between gap-3">
           <div className="flex items-center gap-3">
-            <div className="flex h-10 w-10 items-center justify-center rounded-full bg-zinc-800 text-sm font-bold text-zinc-300 shrink-0">
-              {token.symbol.slice(0, 2)}
-            </div>
+            <TokenIcon symbol={token.symbol} size={40} />
             <div>
               <div className="flex items-center gap-2">
                 <p className="text-sm font-semibold text-zinc-100">{token.name}</p>

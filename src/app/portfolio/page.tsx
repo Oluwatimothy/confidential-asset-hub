@@ -15,6 +15,7 @@ import {
 import { usePortfolio } from '@/hooks/use-portfolio';
 import { useDecryptStore } from '@/stores';
 import { formatTokenAmount, shortAddress } from '@/utils';
+import { TokenIcon } from '@/components/TokenIcon';
 import { ConnectButton } from '@rainbow-me/rainbowkit';
 
 export default function PortfolioPage() {
@@ -44,12 +45,6 @@ export default function PortfolioPage() {
             Your ERC20 and ERC7984 holdings across all registry pairs
           </p>
         </div>
-        <Link href="/decrypt">
-          <Button variant="outline" size="sm">
-            <Lock className="h-3.5 w-3.5" />
-            Decrypt All
-          </Button>
-        </Link>
       </div>
 
       {/* Summary cards */}
@@ -112,9 +107,7 @@ export default function PortfolioPage() {
                     {/* Token info */}
                     <div className="flex items-center gap-3 flex-1 min-w-0">
                       <div className="relative shrink-0">
-                        <div className="flex h-9 w-9 items-center justify-center rounded-full bg-zinc-800 text-xs font-bold text-zinc-300">
-                          {entry.pair.token.symbol.slice(0, 2)}
-                        </div>
+                        <TokenIcon symbol={entry.pair.token.symbol} size={36} />
                         <div className="absolute -bottom-1 -right-1 flex h-5 w-5 items-center justify-center rounded-full border border-zinc-900 bg-amber-400/20 text-[8px] font-bold text-amber-400">c</div>
                       </div>
                       <div className="min-w-0">

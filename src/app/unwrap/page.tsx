@@ -25,6 +25,7 @@ import { formatTokenAmount, parseContractError, getTxUrl } from '@/utils';
 import { ConnectButton } from '@rainbow-me/rainbowkit';
 import { NetworkGuard } from '@/components/NetworkGuard';
 import { BalanceLabel } from '@/components/BalanceLabel';
+import { TokenIcon } from '@/components/TokenIcon';
 import { parseUnits } from 'viem';
 import type { RegistryPair } from '@/types';
 import type { Address } from 'viem';
@@ -622,7 +623,7 @@ function UnwrapPageInner() {
                   : 'border-zinc-800 hover:border-zinc-700 hover:bg-zinc-900'
                   }`}
               >
-                <div className="flex h-8 w-8 items-center justify-center rounded-full bg-amber-400/10 text-xs font-bold text-amber-400 shrink-0">c</div>
+                <TokenIcon symbol={pair.token.symbol} size={32} />
                 <div className="min-w-0">
                   <div className="flex items-center gap-1.5 text-sm font-medium text-zinc-200">
                     <span className="text-amber-400">{pair.confidentialToken.symbol}</span>
