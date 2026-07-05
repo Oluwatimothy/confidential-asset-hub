@@ -48,7 +48,17 @@ export function TokenIcon({
   className?: string;
 }) {
   const key = (symbol || '?').toUpperCase().replace(/[^A-Z0-9]/g, '');
-  const dataUri = KNOWN_LOGO_DATA_URIS[key];
+
+  // Exact match first. If the live on-chain symbol differs slightly from
+  // what was assumed (extra characters, a prefix, a suffix), fall back to
+  // checking whether a known key appears inside it, longest key first so
+  // e.g. STEAKUSDC is checked before USDC and doesn't get misidentified.
+  let dataUri = KNOWN_LOGO_DATA_URIS[key];
+  if (!dataUri) {
+    const sortedKeys = Object.keys(KNOWN_LOGO_DATA_URIS).sort((a, b) => b.length - a.length);
+    const matchedKey = sortedKeys.find((k) => key.includes(k));
+    if (matchedKey) dataUri = KNOWN_LOGO_DATA_URIS[matchedKey];
+  }
 
   if (dataUri) {
     return (
@@ -64,7 +74,12 @@ export function TokenIcon({
     );
   }
 
-  const colors = KNOWN_TOKEN_COLORS[key] ?? fallbackColor(key);
+  let colors = KNOWN_TOKEN_COLORS[key];
+  if (!colors) {
+    const sortedColorKeys = Object.keys(KNOWN_TOKEN_COLORS).sort((a, b) => b.length - a.length);
+    const matchedColorKey = sortedColorKeys.find((k) => key.includes(k));
+    colors = matchedColorKey ? KNOWN_TOKEN_COLORS[matchedColorKey] : fallbackColor(key);
+  }
   return (
     <div
       className={`flex items-center justify-center rounded-full font-bold shrink-0 ${className}`}
