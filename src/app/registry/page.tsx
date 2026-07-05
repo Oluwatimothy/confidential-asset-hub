@@ -32,12 +32,7 @@ function PairRow({ pair }: { pair: RegistryPair }) {
       <div className="flex items-start justify-between gap-4">
         <div className="flex items-center gap-3 min-w-0">
           {/* Token avatars */}
-          <div className="relative shrink-0">
-            <TokenIcon symbol={pair.token.symbol} size={36} />
-            <div className="absolute -bottom-1 -right-1 flex h-5 w-5 items-center justify-center rounded-full border border-zinc-900 bg-amber-400/20 text-[8px] font-bold text-amber-400">
-              c
-            </div>
-          </div>
+          <TokenIcon symbol={pair.token.symbol} size={36} />
           <div className="min-w-0">
             <div className="flex items-center gap-2 flex-wrap">
               <span className="text-sm font-semibold text-zinc-100">{pair.token.name}</span>
@@ -208,8 +203,8 @@ export default function RegistryPage() {
               key={f.value}
               onClick={() => setFilter(f.value)}
               className={`px-3 py-1.5 rounded-lg text-xs font-medium transition-colors ${filter === f.value
-                  ? 'bg-amber-400 text-zinc-950'
-                  : 'bg-zinc-800 text-zinc-400 hover:text-zinc-200 hover:bg-zinc-700'
+                ? 'bg-amber-400 text-zinc-950'
+                : 'bg-zinc-800 text-zinc-400 hover:text-zinc-200 hover:bg-zinc-700'
                 }`}
             >
               {f.label}

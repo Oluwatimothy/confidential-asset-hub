@@ -623,7 +623,10 @@ function UnwrapPageInner() {
                   : 'border-zinc-800 hover:border-zinc-700 hover:bg-zinc-900'
                   }`}
               >
-                <TokenIcon symbol={pair.token.symbol} size={32} />
+                <div className="relative shrink-0">
+                  <TokenIcon symbol={pair.token.symbol} size={32} />
+                  <div className="absolute -bottom-1 -right-1 flex h-4 w-4 items-center justify-center rounded-full border border-zinc-900 bg-amber-400/20 text-[7px] font-bold text-amber-400">c</div>
+                </div>
                 <div className="min-w-0">
                   <div className="flex items-center gap-1.5 text-sm font-medium text-zinc-200">
                     <span className="text-amber-400">{pair.confidentialToken.symbol}</span>

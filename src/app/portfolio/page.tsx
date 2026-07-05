@@ -20,8 +20,8 @@ import { ConnectButton } from '@rainbow-me/rainbowkit';
 
 export default function PortfolioPage() {
   const { address, isConnected } = useAccount();
-  const { entries, isLoading }   = usePortfolio();
-  const results                  = useDecryptStore((s) => s.results);
+  const { entries, isLoading } = usePortfolio();
+  const results = useDecryptStore((s) => s.results);
 
   if (!isConnected) {
     return (
@@ -106,10 +106,7 @@ export default function PortfolioPage() {
                   >
                     {/* Token info */}
                     <div className="flex items-center gap-3 flex-1 min-w-0">
-                      <div className="relative shrink-0">
-                        <TokenIcon symbol={entry.pair.token.symbol} size={36} />
-                        <div className="absolute -bottom-1 -right-1 flex h-5 w-5 items-center justify-center rounded-full border border-zinc-900 bg-amber-400/20 text-[8px] font-bold text-amber-400">c</div>
-                      </div>
+                      <TokenIcon symbol={entry.pair.token.symbol} size={36} />
                       <div className="min-w-0">
                         <div className="flex items-center gap-1.5">
                           <span className="text-sm font-semibold text-zinc-100">{entry.pair.token.symbol}</span>

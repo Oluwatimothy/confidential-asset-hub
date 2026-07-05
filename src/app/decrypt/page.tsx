@@ -116,7 +116,10 @@ function TokenDecryptCard({ pair }: { pair: RegistryPair }) {
     <div className="rounded-xl border border-zinc-800 bg-zinc-900 p-4 space-y-3">
       <div className="flex items-center justify-between gap-3">
         <div className="flex items-center gap-3 min-w-0">
-          <TokenIcon symbol={pair.token.symbol} size={36} />
+          <div className="relative shrink-0">
+            <TokenIcon symbol={pair.token.symbol} size={36} />
+            <div className="absolute -bottom-1 -right-1 flex h-5 w-5 items-center justify-center rounded-full border border-zinc-900 bg-amber-400/20 text-[8px] font-bold text-amber-400">c</div>
+          </div>
           <div className="min-w-0">
             <p className="text-sm font-medium text-zinc-200">{pair.confidentialToken.symbol}</p>
             <p className="text-xs text-zinc-600 font-data">{shortAddress(contractAddress)}</p>
