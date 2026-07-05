@@ -12,13 +12,22 @@
 // ============================================================
 'use client';
 
-import React from 'react';
+import React, { useState } from 'react';
+
+// Only tokens with a verified, currently-working logo URL go here.
+// Confirmed directly against CoinGecko's own pages/API docs this session,
+// not guessed from memory, a wrong guess on a well-known brand is worse
+// than the honest color-initial fallback below.
+const KNOWN_LOGO_URLS: Record<string, string> = {
+  ZAMA: 'https://assets.coingecko.com/coins/images/70921/standard/zama.png?1764591992',
+  WETH: 'https://coin-images.coingecko.com/coins/images/2518/large/weth.png?1696503332',
+};
 
 const KNOWN_TOKEN_COLORS: Record<string, { bg: string; text: string }> = {
   USDC: { bg: '#2775CA', text: '#FFFFFF' },
   USDT: { bg: '#26A17B', text: '#FFFFFF' },
   WETH: { bg: '#627EEA', text: '#FFFFFF' },
-  ETH:  { bg: '#627EEA', text: '#FFFFFF' },
+  ETH: { bg: '#627EEA', text: '#FFFFFF' },
   ZAMA: { bg: '#FFD208', text: '#000000' }, // Zama brand: black on yellow
   XAUT: { bg: '#C9A227', text: '#000000' }, // Tether Gold, gold tone
   BRON: { bg: '#52525B', text: '#FFFFFF' },
@@ -44,8 +53,26 @@ export function TokenIcon({
   className?: string;
 }) {
   const key = (symbol || '?').toUpperCase();
-  const colors = KNOWN_TOKEN_COLORS[key] ?? fallbackColor(key);
+  const [imgFailed, setImgFailed] = useState(false);
+  const logoUrl = KNOWN_LOGO_URLS[key];
 
+  if (logoUrl && !imgFailed) {
+    return (
+      <img
+        src={logoUrl}
+        alt={symbol}
+        title={symbol}
+        width={size}
+        height={size}
+        className={`rounded-full shrink-0 object-cover ${className}`}
+        // If the URL ever breaks (rehosted, rate-limited, etc.), fall back
+        // to the colored initial badge instead of a broken image icon.
+        onError={() => setImgFailed(true)}
+      />
+    );
+  }
+
+  const colors = KNOWN_TOKEN_COLORS[key] ?? fallbackColor(key);
   return (
     <div
       className={`flex items-center justify-center rounded-full font-bold shrink-0 ${className}`}
