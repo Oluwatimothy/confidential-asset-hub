@@ -21,7 +21,7 @@ const KNOWN_TOKEN_COLORS: Record<string, { bg: string; text: string }> = {
   USDC: { bg: '#2775CA', text: '#FFFFFF' },
   USDT: { bg: '#26A17B', text: '#FFFFFF' },
   WETH: { bg: '#627EEA', text: '#FFFFFF' },
-  ETH: { bg: '#627EEA', text: '#FFFFFF' },
+  ETH:  { bg: '#627EEA', text: '#FFFFFF' },
   ZAMA: { bg: '#FFD208', text: '#000000' }, // Zama brand: black on yellow
   XAUT: { bg: '#C9A227', text: '#000000' }, // Tether Gold, gold tone
   BRON: { bg: '#52525B', text: '#FFFFFF' },
