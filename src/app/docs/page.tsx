@@ -10,9 +10,9 @@ import { Card, CardContent, Separator } from '@/components/ui';
 import { cn } from '@/utils';
 
 interface DocSection {
-  id:       string;
-  title:    string;
-  content:  React.ReactNode;
+  id: string;
+  title: string;
+  content: React.ReactNode;
 }
 
 function AccordionItem({ section }: { section: DocSection }) {
@@ -51,7 +51,7 @@ const Code = ({ children }: { children: React.ReactNode }) => (
 
 const SECTIONS: DocSection[] = [
   {
-    id:    'overview',
+    id: 'overview',
     title: 'What is Confidential Asset Hub?',
     content: (
       <div className="space-y-2">
@@ -68,7 +68,7 @@ const SECTIONS: DocSection[] = [
     ),
   },
   {
-    id:    'erc7984',
+    id: 'erc7984',
     title: 'What is ERC7984?',
     content: (
       <div className="space-y-2">
@@ -87,7 +87,7 @@ const SECTIONS: DocSection[] = [
     ),
   },
   {
-    id:    'wrap-flow',
+    id: 'wrap-flow',
     title: 'How does wrapping work?',
     content: (
       <div className="space-y-2">
@@ -103,7 +103,7 @@ const SECTIONS: DocSection[] = [
     ),
   },
   {
-    id:    'unwrap-flow',
+    id: 'unwrap-flow',
     title: 'How does unwrapping work?',
     content: (
       <div className="space-y-2">
@@ -126,7 +126,7 @@ const SECTIONS: DocSection[] = [
     ),
   },
   {
-    id:    'decrypt-flow',
+    id: 'decrypt-flow',
     title: 'How does balance decryption work?',
     content: (
       <div className="space-y-2">
@@ -145,7 +145,7 @@ const SECTIONS: DocSection[] = [
     ),
   },
   {
-    id:    'registry',
+    id: 'registry',
     title: 'How does the registry work?',
     content: (
       <div className="space-y-2">
@@ -162,7 +162,7 @@ const SECTIONS: DocSection[] = [
     ),
   },
   {
-    id:    'faucet',
+    id: 'faucet',
     title: 'How does the faucet work?',
     content: (
       <p>
@@ -174,22 +174,22 @@ const SECTIONS: DocSection[] = [
     ),
   },
   {
-    id:    'custom-pairs',
+    id: 'custom-pairs',
     title: 'How do I add a custom pair?',
     content: (
       <div className="space-y-2">
         <p>Use the <strong className="text-zinc-200">Add Custom Pair</strong> wizard (sidebar), or edit directly:</p>
         <ol className="list-decimal list-inside space-y-1.5 text-zinc-400">
           <li>Open <Code>src/config/custom-pairs.ts</Code>.</li>
-          <li>Add an entry to the <Code>CUSTOM_PAIRS</Code> array following the example structure.</li>
-          <li>Rebuild the app (<Code>npm run build</Code>).</li>
-          <li>The pair appears in Registry Explorer, Portfolio, Wrap Center, and Unwrap Center.</li>
+          <li>Add an entry to the <Code>CUSTOM_PAIRS</Code> array in that file, following the example structure.</li>
+          <li>Either push the change directly to main if you maintain this repo, or open a pull request against it if you don't.</li>
+          <li>Vercel rebuilds and redeploys automatically once that change is merged, no manual <Code>npm run build</Code> needed. The pair then appears in Registry Explorer, Portfolio, Wrap Center, and Unwrap Center.</li>
         </ol>
       </div>
     ),
   },
   {
-    id:    'sdk',
+    id: 'sdk',
     title: 'Which SDKs are used?',
     content: (
       <div className="space-y-2">
@@ -204,7 +204,7 @@ const SECTIONS: DocSection[] = [
     ),
   },
   {
-    id:    'security',
+    id: 'security',
     title: 'Security considerations',
     content: (
       <div className="space-y-2">
@@ -222,11 +222,11 @@ const SECTIONS: DocSection[] = [
 ];
 
 const LINKS = [
-  { label: 'Zama Protocol Docs',        href: 'https://docs.zama.org/protocol' },
-  { label: 'FHEVM Documentation',       href: 'https://docs.zama.org/fhevm' },
-  { label: 'ERC-7984 Specification',    href: 'https://eips.ethereum.org/EIPS/eip-7984' },
-  { label: 'Zama GitHub',               href: 'https://github.com/zama-ai' },
-  { label: 'Official Wrappers Registry',href: 'https://github.com/zama-ai/protocol-apps' },
+  { label: 'Zama Protocol Docs', href: 'https://docs.zama.org/protocol' },
+  { label: 'FHEVM Documentation', href: 'https://docs.zama.org/fhevm' },
+  { label: 'ERC-7984 Specification', href: 'https://eips.ethereum.org/EIPS/eip-7984' },
+  { label: 'Zama GitHub', href: 'https://github.com/zama-ai' },
+  { label: 'Official Wrappers Registry', href: 'https://github.com/zama-ai/protocol-apps' },
 ];
 
 export default function DocsPage() {
