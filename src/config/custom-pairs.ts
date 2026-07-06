@@ -176,6 +176,7 @@ export const CUSTOM_PAIRS: CustomPairEntry[] = [
     notes: '',
     addedAt: 1783223522438,
   },
+
 ];
 
 export function buildCustomRegistryPairs(): RegistryPair[] {

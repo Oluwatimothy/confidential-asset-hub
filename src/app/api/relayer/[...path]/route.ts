@@ -5,6 +5,19 @@ const RELAYER_URLS: Record<string, string> = {
     mainnet: 'https://relayer.mainnet.zama.org/v2',
 };
 
+// Zama's mainnet Relayer requires an API key (requested via Zama's Mainnet
+// Relayer API Access form); the Sepolia testnet relayer does not need one.
+// This is read server-side only (never sent to the browser) and attached
+// solely on mainnet requests, so Sepolia's existing behavior is untouched.
+const ZAMA_MAINNET_RELAYER_API_KEY = process.env.ZAMA_RELAYER_API_KEY;
+
+function relayerHeaders(network: string, base: Record<string, string>) {
+    if (network === 'mainnet' && ZAMA_MAINNET_RELAYER_API_KEY) {
+        return { ...base, 'x-api-key': ZAMA_MAINNET_RELAYER_API_KEY };
+    }
+    return base;
+}
+
 export async function POST(
     request: NextRequest,
     { params }: { params: Promise<{ path: string[] }> },
@@ -20,7 +33,7 @@ export async function POST(
         const body = await request.text();
         const response = await fetch(targetUrl, {
             method: 'POST',
-            headers: { 'Content-Type': 'application/json' },
+            headers: relayerHeaders(network, { 'Content-Type': 'application/json' }),
             body,
         });
         const data = await response.text();
@@ -45,7 +58,9 @@ export async function GET(
         : RELAYER_URLS[network];
 
     try {
-        const response = await fetch(targetUrl);
+        const response = await fetch(targetUrl, {
+            headers: relayerHeaders(network, {}),
+        });
         const data = await response.text();
         return new NextResponse(data, {
             status: response.status,
