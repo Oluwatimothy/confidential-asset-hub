@@ -68,6 +68,48 @@ export const useRegistryStore = create<RegistryStore>()((set, get) => ({
   },
 }));
 
+// ── Local Custom Pairs Store (persisted, browser-only) ─────────
+// Distinct from src/config/custom-pairs.ts (the "dev" mechanism, which
+// requires a code change and redeploy to appear for everyone). Pairs
+// added here live only in this browser's localStorage, added and
+// removed instantly with no deploy, and are invisible to anyone else.
+interface LocalPairsStore {
+  pairs: RegistryPair[];
+  addPair: (pair: RegistryPair) => void;
+  removePair: (confidentialTokenAddress: Address, chainId: SupportedChainId) => void;
+}
+
+export const useLocalPairsStore = create<LocalPairsStore>()(
+  persist(
+    (set) => ({
+      pairs: [],
+      addPair: (pair) =>
+        set((s) => ({
+          pairs: [
+            ...s.pairs.filter(
+              (p) =>
+                !(p.confidentialToken.address.toLowerCase() === pair.confidentialToken.address.toLowerCase() &&
+                  Number(p.chainId) === Number(pair.chainId)),
+            ),
+            pair,
+          ],
+        })),
+      removePair: (confidentialTokenAddress, chainId) =>
+        set((s) => ({
+          pairs: s.pairs.filter(
+            (p) =>
+              !(p.confidentialToken.address.toLowerCase() === confidentialTokenAddress.toLowerCase() &&
+                Number(p.chainId) === Number(chainId)),
+          ),
+        })),
+    }),
+    {
+      name: 'cah-local-custom-pairs',
+      storage: bigintSafeStorage('cah-local-custom-pairs'),
+    },
+  ),
+);
+
 // ── Decrypt Store ──────────────────────────────────────────────
 interface DecryptStore {
   results: Record<string, DecryptionResult>;

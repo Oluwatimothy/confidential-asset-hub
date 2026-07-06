@@ -9,7 +9,7 @@ export const SUPPORTED_CHAIN_IDS = [1, 11155111] as const;
 export type SupportedChainId = (typeof SUPPORTED_CHAIN_IDS)[number];
 
 // ── Registry ─────────────────────────────────────────────────
-export type RegistrySource = 'official' | 'custom';
+export type RegistrySource = 'official' | 'custom' | 'local';
 
 export interface TokenInfo {
   address: Address;

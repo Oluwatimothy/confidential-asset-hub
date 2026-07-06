@@ -17,10 +17,14 @@ import {
   Button, Input, Label, Badge, Separator,
 } from '@/components/ui';
 import { useNetwork } from '@/hooks/use-network';
-import { useRegistryStore } from '@/stores';
+import { useRegistryStore, useLocalPairsStore } from '@/stores';
 import { isValidAddress } from '@/utils';
 import { CUSTOM_PAIRS } from '@/config/custom-pairs';
+import { getPublicClient, validateERC7984Address } from '@/services/registry';
+import { ERC7984_ABI } from '@/contracts/erc7984-abi';
+import { ERC20_ABI } from '@/contracts/erc20-abi';
 import type { CustomPairEntry } from '@/config/custom-pairs';
+import type { RegistryPair } from '@/types';
 import type { SupportedChainId } from '@/types';
 
 // ── Zod schema ─────────────────────────────────────────────────
@@ -33,45 +37,232 @@ const schema = z.object({
     .string()
     .min(1, 'Required')
     .refine(isValidAddress, 'Not a valid Ethereum address'),
-  name: z.string().min(1, 'Required').max(64),
-  symbol: z.string().min(1, 'Required').max(16),
+  name:     z.string().min(1, 'Required').max(64),
+  symbol:   z.string().min(1, 'Required').max(16),
   decimals: z.coerce.number().int().min(0).max(18),
-  notes: z.string().max(256).optional(),
+  notes:    z.string().max(256).optional(),
 });
 
 type FormValues = z.infer<typeof schema>;
 
 type WizardStep = 'form' | 'confirm' | 'success';
 
-// ── Step dots ─────────────────────────────────────────────────
-function WizardSteps({ step }: { step: WizardStep }) {
-  const steps = ['form', 'confirm', 'success'] as WizardStep[];
+// ── Add Custom Pair Locally ─────────────────────────────────────
+function LocalCustomPairSection() {
+  const { chainId } = useNetwork();
+  const { pairs: onChainPairs } = useRegistryStore();
+  const { pairs: localPairs, addPair, removePair } = useLocalPairsStore();
+
+  const [address, setAddress] = useState('');
+  const [checking, setChecking] = useState(false);
+  const [error, setError] = useState('');
+  const [preview, setPreview] = useState<RegistryPair | null>(null);
+
+  const scopedLocalPairs = localPairs.filter((p) => Number(p.chainId) === Number(chainId));
+
+  async function handleValidate() {
+    setError('');
+    setPreview(null);
+
+    if (!isValidAddress(address)) {
+      setError('Enter a valid contract address.');
+      return;
+    }
+
+    const alreadyLocal = scopedLocalPairs.some(
+      (p) => p.confidentialToken.address.toLowerCase() === address.toLowerCase(),
+    );
+    const alreadyElsewhere = [...onChainPairs, ...CUSTOM_PAIRS].some(
+      (p) => p.confidentialToken.address.toLowerCase() === address.toLowerCase(),
+    );
+    if (alreadyLocal) {
+      setError('This address is already in your local custom pairs.');
+      return;
+    }
+    if (alreadyElsewhere) {
+      setError('This address is already in the official registry or dev custom pairs, no need to add it locally.');
+      return;
+    }
+
+    setChecking(true);
+    try {
+      const isERC7984 = await validateERC7984Address(address as `0x${string}`, chainId);
+      if (!isERC7984) {
+        setError('This address does not look like a valid ERC7984 confidential token (interface check failed).');
+        setChecking(false);
+        return;
+      }
+
+      const client = getPublicClient(chainId);
+
+      const [cName, cSymbol, cDecimals, underlyingAddress] = await Promise.all([
+        client.readContract({ address: address as `0x${string}`, abi: ERC7984_ABI, functionName: 'name' }),
+        client.readContract({ address: address as `0x${string}`, abi: ERC7984_ABI, functionName: 'symbol' }),
+        client.readContract({ address: address as `0x${string}`, abi: ERC7984_ABI, functionName: 'decimals' }),
+        client.readContract({ address: address as `0x${string}`, abi: ERC7984_ABI, functionName: 'underlying' }),
+      ]);
+
+      if (!underlyingAddress || underlyingAddress === '0x0000000000000000000000000000000000000000') {
+        setError('Could not find an underlying ERC20 address on this contract. It may not be a wrapper token.');
+        setChecking(false);
+        return;
+      }
+
+      const [uName, uSymbol, uDecimals] = await Promise.all([
+        client.readContract({ address: underlyingAddress as `0x${string}`, abi: ERC20_ABI, functionName: 'name' }),
+        client.readContract({ address: underlyingAddress as `0x${string}`, abi: ERC20_ABI, functionName: 'symbol' }),
+        client.readContract({ address: underlyingAddress as `0x${string}`, abi: ERC20_ABI, functionName: 'decimals' }),
+      ]);
+
+      let rate = 10n ** (BigInt(uDecimals as number) - BigInt(cDecimals as number));
+      try {
+        const onChainRate = await client.readContract({
+          address: address as `0x${string}`,
+          abi: ERC7984_ABI,
+          functionName: 'rate',
+        });
+        if (onChainRate) rate = onChainRate as bigint;
+      } catch {
+        // Not every wrapper exposes rate(), fall back to the decimals-derived value above.
+      }
+
+      setPreview({
+        token: {
+          address: underlyingAddress as `0x${string}`,
+          name: uName as string,
+          symbol: uSymbol as string,
+          decimals: uDecimals as number,
+        },
+        confidentialToken: {
+          address: address as `0x${string}`,
+          name: cName as string,
+          symbol: cSymbol as string,
+          decimals: cDecimals as number,
+        },
+        rate,
+        isValid: true,
+        source: 'local',
+        chainId: chainId as SupportedChainId,
+        addedAt: Date.now(),
+      });
+    } catch {
+      setError('Could not read this contract. Make sure the address is correct and you are on the right network.');
+    } finally {
+      setChecking(false);
+    }
+  }
+
+  function handleAddLocally() {
+    if (!preview) return;
+    addPair(preview);
+    setPreview(null);
+    setAddress('');
+  }
+
   return (
-    <div className="flex items-center gap-2 mb-6">
-      {steps.map((s, i) => (
-        <React.Fragment key={s}>
-          <div
-            className={`flex h-6 w-6 items-center justify-center rounded-full text-xs font-medium transition-colors ${s === step
-                ? 'bg-amber-400 text-zinc-950'
-                : steps.indexOf(step) > i
-                  ? 'bg-emerald-500/20 text-emerald-400 border border-emerald-500/30'
-                  : 'bg-zinc-800 text-zinc-500'
-              }`}
-          >
-            {steps.indexOf(step) > i ? <CheckCircle2 className="h-3.5 w-3.5" /> : i + 1}
+    <div className="space-y-4">
+      <div>
+        <h3 className="text-sm font-semibold text-zinc-300">Add Custom Pair Locally</h3>
+        <p className="text-xs text-zinc-500 mt-0.5">
+          Add a local custom pair that can be decrypted, transferred, wrapped, and unwrapped
+          locally in your browser. Nothing is sent anywhere, it's stored only on this device,
+          it persists across page refreshes, and you can remove it at any time.
+        </p>
+      </div>
+
+      <Card>
+        <CardContent className="p-6 space-y-4">
+          <div className="space-y-1.5">
+            <Label htmlFor="localErc7984">ERC7984 Confidential Token Address</Label>
+            <Input
+              id="localErc7984"
+              placeholder="0x…"
+              className="font-data"
+              value={address}
+              onChange={(e) => { setAddress(e.target.value); setError(''); setPreview(null); }}
+            />
+            <p className="text-[10px] text-zinc-600">
+              The underlying ERC20 address, name, symbol, decimals, and wrap rate are all
+              read directly from the contract, nothing else to fill in.
+            </p>
           </div>
-          {i < steps.length - 1 && (
-            <div className={`h-px flex-1 transition-colors ${steps.indexOf(step) > i ? 'bg-emerald-500/30' : 'bg-zinc-800'}`} />
+
+          {error && (
+            <div className="flex items-start gap-2 rounded-lg border border-red-500/30 bg-red-500/5 p-3">
+              <AlertCircle className="h-4 w-4 text-red-400 shrink-0 mt-0.5" />
+              <p className="text-xs text-red-400">{error}</p>
+            </div>
           )}
-        </React.Fragment>
-      ))}
+
+          {preview && (
+            <div className="space-y-2 rounded-xl border border-emerald-500/20 bg-emerald-500/5 p-3">
+              {[
+                { label: 'Underlying ERC20', value: `${preview.token.symbol} — ${preview.token.name}` },
+                { label: 'Confidential Token', value: `${preview.confidentialToken.symbol} — ${preview.confidentialToken.name}` },
+                { label: 'Underlying Address', value: preview.token.address },
+                { label: 'Decimals', value: `${preview.token.decimals} underlying / ${preview.confidentialToken.decimals} confidential` },
+              ].map((row) => (
+                <div key={row.label} className="flex items-start justify-between gap-3 text-xs">
+                  <span className="text-zinc-500 shrink-0">{row.label}</span>
+                  <span className="text-zinc-200 text-right break-all font-data">{row.value}</span>
+                </div>
+              ))}
+            </div>
+          )}
+
+          {!preview ? (
+            <Button className="w-full" onClick={handleValidate} isLoading={checking} disabled={checking || !address}>
+              {checking ? 'Checking contract…' : 'Validate'}
+            </Button>
+          ) : (
+            <div className="flex gap-2">
+              <Button variant="outline" className="flex-1" onClick={() => setPreview(null)}>
+                Cancel
+              </Button>
+              <Button className="flex-1" onClick={handleAddLocally}>
+                Add Locally
+                <CheckCircle2 className="h-4 w-4" />
+              </Button>
+            </div>
+          )}
+        </CardContent>
+      </Card>
+
+      {scopedLocalPairs.length > 0 && (
+        <Card>
+          <CardHeader className="pb-3">
+            <CardTitle className="text-base">Your Local Custom Pairs</CardTitle>
+            <CardDescription>Stored only in this browser, on this device</CardDescription>
+          </CardHeader>
+          <CardContent className="pt-0 space-y-2">
+            {scopedLocalPairs.map((p, i) => (
+              <div key={i} className="flex items-center justify-between rounded-lg bg-zinc-900/60 px-3 py-2.5">
+                <div className="flex items-center gap-2 min-w-0">
+                  <Badge variant="secondary">local</Badge>
+                  <span className="text-sm text-zinc-300 truncate">{p.token.symbol}</span>
+                  <ChevronRight className="h-3 w-3 text-zinc-600 shrink-0" />
+                  <span className="text-sm text-amber-400 truncate">{p.confidentialToken.symbol}</span>
+                </div>
+                <button
+                  onClick={() => removePair(p.confidentialToken.address, p.chainId)}
+                  className="text-xs text-zinc-500 hover:text-red-400 shrink-0 ml-2"
+                >
+                  Remove
+                </button>
+              </div>
+            ))}
+          </CardContent>
+        </Card>
+      )}
+
+      <div className="border-t border-zinc-800 pt-2" />
     </div>
   );
 }
 
 export default function AddPairPage() {
   const { chainId } = useNetwork();
-  const { pairs } = useRegistryStore();
+  const { pairs }   = useRegistryStore();
 
   const [wizardStep, setWizardStep] = useState<WizardStep>('form');
   const [pendingEntry, setPendingEntry] = useState<CustomPairEntry | null>(null);
@@ -112,21 +303,21 @@ export default function AddPairPage() {
 
     const entry: CustomPairEntry = {
       token: {
-        address: data.erc20Address as `0x${string}`,
-        name: data.name,
-        symbol: data.symbol,
+        address:  data.erc20Address as `0x${string}`,
+        name:     data.name,
+        symbol:   data.symbol,
         decimals: data.decimals,
       },
       confidentialToken: {
-        address: data.erc7984Address as `0x${string}`,
-        name: `Confidential ${data.name}`,
-        symbol: `c${data.symbol}`,
+        address:  data.erc7984Address as `0x${string}`,
+        name:     `Confidential ${data.name}`,
+        symbol:   `c${data.symbol}`,
         decimals: data.decimals,
       },
-      rate: 1n,
-      chainId: chainId as SupportedChainId,
-      notes: data.notes,
-      addedAt: Date.now(),
+      rate:     1n,
+      chainId:  chainId as SupportedChainId,
+      notes:    data.notes,
+      addedAt:  Date.now(),
     };
 
     setPendingEntry(entry);
@@ -176,16 +367,26 @@ export default function AddPairPage() {
         </p>
       </div>
 
+      <LocalCustomPairSection />
+
+      <div className="pt-2">
+        <h3 className="text-sm font-semibold text-zinc-300">Dev Custom Pair</h3>
+        <p className="text-xs text-zinc-500 mt-0.5">
+          For the project maintainer. Requires a code change and a redeploy, but once live,
+          it appears for every visitor of this app, not just your own browser.
+        </p>
+      </div>
+
       <div className="rounded-xl border border-amber-400/20 bg-amber-400/5 p-4">
         <div className="flex items-start gap-3">
           <Info className="h-4 w-4 text-amber-400 shrink-0 mt-0.5" />
           <div className="space-y-1 text-xs text-zinc-400 leading-relaxed">
-            <p className="font-medium text-amber-400">How custom pairs work</p>
+            <p className="font-medium text-amber-400">How dev custom pairs work</p>
             <p>
               Custom pairs live in <code className="font-data text-amber-400/70">src/config/custom-pairs.ts</code>{' '}
               and are merged with the official on-chain registry at build time.
-              After completing this wizard, copy the generated snippet into the
-              <code className="font-data text-amber-400/70"> CUSTOM_PAIRS</code> array in that file,
+              After completing this wizard, copy the generated snippet into the{' '}
+              <code className="font-data text-amber-400/70">CUSTOM_PAIRS</code> array in that file,
               then either push directly to main if you maintain this repo, or open a
               pull request if you don't. The pair goes live automatically once that
               change is merged and Vercel redeploys, no manual build step needed.
@@ -196,8 +397,6 @@ export default function AddPairPage() {
 
       <Card>
         <CardContent className="p-6">
-          <WizardSteps step={wizardStep} />
-
           <AnimatePresence mode="wait">
             {/* ── Step 1: Form ── */}
             {wizardStep === 'form' && (
@@ -298,12 +497,12 @@ export default function AddPairPage() {
               >
                 <div className="space-y-2">
                   {[
-                    { label: 'ERC20 Address', value: pendingEntry.token.address },
-                    { label: 'ERC7984 Address', value: pendingEntry.confidentialToken.address },
-                    { label: 'Name', value: pendingEntry.token.name },
-                    { label: 'Symbol', value: pendingEntry.token.symbol },
-                    { label: 'Decimals', value: pendingEntry.token.decimals.toString() },
-                    { label: 'Chain', value: `Chain ID ${pendingEntry.chainId}` },
+                    { label: 'ERC20 Address',   value: pendingEntry.token.address       },
+                    { label: 'ERC7984 Address',  value: pendingEntry.confidentialToken.address },
+                    { label: 'Name',             value: pendingEntry.token.name          },
+                    { label: 'Symbol',           value: pendingEntry.token.symbol        },
+                    { label: 'Decimals',         value: pendingEntry.token.decimals.toString() },
+                    { label: 'Chain',            value: `Chain ID ${pendingEntry.chainId}` },
                   ].map((row) => (
                     <div key={row.label} className="flex items-start justify-between gap-3 py-1.5 border-b border-zinc-800">
                       <span className="text-xs text-zinc-500 shrink-0 w-32">{row.label}</span>

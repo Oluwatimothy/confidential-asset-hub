@@ -203,8 +203,8 @@ export default function RegistryPage() {
               key={f.value}
               onClick={() => setFilter(f.value)}
               className={`px-3 py-1.5 rounded-lg text-xs font-medium transition-colors ${filter === f.value
-                ? 'bg-amber-400 text-zinc-950'
-                : 'bg-zinc-800 text-zinc-400 hover:text-zinc-200 hover:bg-zinc-700'
+                  ? 'bg-amber-400 text-zinc-950'
+                  : 'bg-zinc-800 text-zinc-400 hover:text-zinc-200 hover:bg-zinc-700'
                 }`}
             >
               {f.label}

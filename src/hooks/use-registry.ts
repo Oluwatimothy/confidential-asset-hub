@@ -5,7 +5,7 @@
 
 import { useQuery } from '@tanstack/react-query';
 import { fetchFullRegistry } from '@/services/registry';
-import { useRegistryStore } from '@/stores';
+import { useRegistryStore, useLocalPairsStore } from '@/stores';
 import { useNetwork } from './use-network';
 import type { RegistryPair } from '@/types';
 
@@ -22,6 +22,7 @@ export interface UseRegistryReturn {
 export function useRegistry(): UseRegistryReturn {
   const { chainId } = useNetwork();
   const { setPairs, setLastSynced } = useRegistryStore();
+  const localPairs = useLocalPairsStore((s) => s.pairs);
 
   const query = useQuery({
     queryKey:    ['registry', chainId],
@@ -40,8 +41,12 @@ export function useRegistry(): UseRegistryReturn {
   const storedPairs = useRegistryStore((s) => s.pairs);
   const lastSyncedAt = useRegistryStore((s) => s.lastSyncedAt);
 
+  const basePairs = query.data ?? storedPairs;
+  const scopedLocalPairs = localPairs.filter((p) => Number(p.chainId) === Number(chainId));
+  const allPairs = [...basePairs, ...scopedLocalPairs];
+
   return {
-    pairs:        query.data ?? storedPairs,
+    pairs:        allPairs,
     isLoading:    query.isLoading,
     isError:      query.isError,
     error:        query.error,

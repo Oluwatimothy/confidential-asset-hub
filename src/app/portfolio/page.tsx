@@ -20,8 +20,8 @@ import { ConnectButton } from '@rainbow-me/rainbowkit';
 
 export default function PortfolioPage() {
   const { address, isConnected } = useAccount();
-  const { entries, isLoading } = usePortfolio();
-  const results = useDecryptStore((s) => s.results);
+  const { entries, isLoading }   = usePortfolio();
+  const results                  = useDecryptStore((s) => s.results);
 
   if (!isConnected) {
     return (

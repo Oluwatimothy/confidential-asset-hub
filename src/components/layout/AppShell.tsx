@@ -35,28 +35,28 @@ import { timeAgo } from '@/utils';
 
 // ── Nav items ─────────────────────────────────────────────────
 const NAV_ITEMS = [
-  { href: '/', label: 'Dashboard', icon: LayoutDashboard },
-  { href: '/registry', label: 'Registry', icon: BookOpen },
-  { href: '/portfolio', label: 'Portfolio', icon: Briefcase },
+  { href: '/',          label: 'Dashboard',       icon: LayoutDashboard },
+  { href: '/registry',  label: 'Registry',         icon: BookOpen        },
+  { href: '/portfolio', label: 'Portfolio',        icon: Briefcase       },
   null, // divider
-  { href: '/wrap', label: 'Wrap Assets', icon: ArrowUpCircle },
-  { href: '/unwrap', label: 'Unwrap Assets', icon: ArrowDownCircle },
-  { href: '/decrypt', label: 'Decrypt Balance', icon: Lock },
-  { href: '/transfer', label: 'Transfer cToken', icon: Send },
+  { href: '/wrap',      label: 'Wrap Assets',      icon: ArrowUpCircle   },
+  { href: '/unwrap',    label: 'Unwrap Assets',    icon: ArrowDownCircle },
+  { href: '/decrypt',   label: 'Decrypt Balance',  icon: Lock            },
+  { href: '/transfer',  label: 'Transfer cToken',  icon: Send            },
   null,
-  { href: '/faucet', label: 'Faucet', icon: Droplets },
-  { href: '/analytics', label: 'Analytics', icon: BarChart3 },
-  { href: '/add-pair', label: 'Add Custom Pair', icon: PlusCircle },
+  { href: '/faucet',    label: 'Faucet',           icon: Droplets        },
+  { href: '/analytics', label: 'Analytics',        icon: BarChart3       },
+  { href: '/add-pair',  label: 'Add Custom Pair',  icon: PlusCircle      },
   null,
-  { href: '/docs', label: 'Documentation', icon: FileText },
+  { href: '/docs',      label: 'Documentation',    icon: FileText        },
 ] as const;
 
 // ── Sidebar ───────────────────────────────────────────────────
 function Sidebar({ collapsed, onCollapse }: { collapsed: boolean; onCollapse: () => void }) {
-  const pathname = usePathname();
+  const pathname      = usePathname();
   const { chainName, isSepolia, isSupported } = useNetwork();
-  const lastSyncedAt = useRegistryStore((s) => s.lastSyncedAt);
-  const isSyncing = useRegistryStore((s) => s.isSyncing);
+  const lastSyncedAt  = useRegistryStore((s) => s.lastSyncedAt);
+  const isSyncing     = useRegistryStore((s) => s.isSyncing);
 
   return (
     <motion.aside
@@ -99,7 +99,7 @@ function Sidebar({ collapsed, onCollapse }: { collapsed: boolean; onCollapse: ()
           if (item === null) {
             return <div key={`div-${i}`} className="my-2 h-px bg-zinc-800 mx-2" />;
           }
-          const Icon = item.icon;
+          const Icon     = item.icon;
           const isActive = pathname === item.href;
           return (
             <Tooltip key={item.href} content={collapsed ? item.label : ''}>
@@ -137,18 +137,10 @@ function Sidebar({ collapsed, onCollapse }: { collapsed: boolean; onCollapse: ()
             {isSyncing
               ? <><RefreshCw className="h-3 w-3 animate-spin text-amber-400" /><span className="text-amber-400/70">Syncing…</span></>
               : lastSyncedAt
-                ? <><Activity className="h-3 w-3" /><span>Synced {timeAgo(lastSyncedAt)}</span></>
-                : <><Activity className="h-3 w-3" /><span>Not synced</span></>
+              ? <><Activity className="h-3 w-3" /><span>Synced {timeAgo(lastSyncedAt)}</span></>
+              : <><Activity className="h-3 w-3" /><span>Not synced</span></>
             }
           </div>
-
-          <a href="https://x.com/tim_0x1"
-            target="_blank"
-            rel="noopener noreferrer"
-            className="block text-center text-[10px] text-zinc-700 hover:text-amber-400 pt-1"
-          >
-            Built by @tim_0x1
-          </a>
         </div>
       )}
     </motion.aside>
