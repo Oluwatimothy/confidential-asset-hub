@@ -267,40 +267,6 @@ function UnwrapForm({
             Refresh Balance
           </Button>
         )}
-
-        {/* Manual recovery, for requests our own tracking never saw
-            (e.g. page was reloaded before a signature resolved) */}
-        {(status === 'idle' || status === 'error') && (
-          <div>
-            <button
-              type="button"
-              onClick={() => setShowManualResume((v) => !v)}
-              className="text-xs text-zinc-500 hover:text-amber-400 underline underline-offset-2"
-            >
-              Have an unfinalized unwrap? Paste transaction hash to finalize
-            </button>
-            {showManualResume && (
-              <div className="mt-2 space-y-1.5">
-                <Label>Unwrap transaction hash</Label>
-                <Input
-                  placeholder="0x…"
-                  value={manualTxHash}
-                  onChange={(e) => { setManualTxHash(e.target.value); setManualError(''); }}
-                  error={manualError}
-                  className="font-data"
-                />
-                <p className="text-[10px] text-zinc-600">
-                  Paste the hash of your unwrap transaction, from your wallet's activity
-                  or from an Etherscan link. The request ID is read from it automatically.
-                </p>
-                <Button size="sm" variant="outline" onClick={handleLoadFromTxHash} isLoading={manualLoading} disabled={manualLoading}>
-                  {manualLoading ? 'Looking up…' : 'Load and Finalize'}
-                </Button>
-              </div>
-            )}
-          </div>
-        )}
-
         {/* Amount input — only when idle or error */}
         {(status === 'idle' || status === 'error') && (
           <div className="space-y-1.5">
@@ -446,21 +412,48 @@ function UnwrapForm({
             Finalizing…
           </Button>
         )}
-        {status === 'success' && (
-          <Button variant="outline" className="w-full" onClick={handleReset}>
-            Unwrap more
-          </Button>
-        )}
         {status === 'error' && (
           <Button className="w-full" onClick={() => { setStatus('idle'); setErrorMsg(''); }}>
             Try again
           </Button>
         )}
+
+        {/* Manual recovery, for requests our own tracking never saw
+            (e.g. page was reloaded before a signature resolved) */}
+        {(status === 'idle' || status === 'error') && (
+          <div>
+            <button
+              type="button"
+              onClick={() => setShowManualResume((v) => !v)}
+              className="text-xs text-zinc-500 hover:text-amber-400 underline underline-offset-2"
+            >
+              Have an unfinalized unwrap? Paste transaction hash to finalize
+            </button>
+            {showManualResume && (
+              <div className="mt-2 space-y-1.5">
+                <Label>Unwrap transaction hash</Label>
+                <Input
+                  placeholder="0x…"
+                  value={manualTxHash}
+                  onChange={(e) => { setManualTxHash(e.target.value); setManualError(''); }}
+                  error={manualError}
+                  className="font-data"
+                />
+                <p className="text-[10px] text-zinc-600">
+                  Paste the hash of your unwrap transaction, from your wallet's activity
+                  or from an Etherscan link. The request ID is read from it automatically.
+                </p>
+                <Button size="sm" variant="outline" onClick={handleLoadFromTxHash} isLoading={manualLoading} disabled={manualLoading}>
+                  {manualLoading ? 'Looking up…' : 'Load and Finalize'}
+                </Button>
+              </div>
+            )}
+          </div>
+        )}
       </CardContent>
     </Card>
   );
 }
-
 function UnwrapPageInner() {
   const { isConnected, address: connectedAddress } = useAccount();
   const { chainId } = useNetwork();
