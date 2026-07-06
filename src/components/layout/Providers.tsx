@@ -10,6 +10,7 @@ import { createConfig as createZamaConfig } from '@zama-fhe/react-sdk/wagmi';
 import { web } from '@zama-fhe/sdk/web';
 import { sepolia, mainnet } from '@zama-fhe/sdk/chains';
 import { IdleDisconnect } from '@/components/IdleDisconnect';
+import { WalletResetWatcher } from '@/components/WalletResetWatcher';
 
 import '@rainbow-me/rainbowkit/styles.css';
 
@@ -65,6 +66,7 @@ export function Providers({ children }: { children: React.ReactNode }) {
           <ZamaProvider config={zamaConfig}>
             {children}
             <IdleDisconnect />
+            <WalletResetWatcher />
           </ZamaProvider>
         </RainbowKitProvider>
       </QueryClientProvider>

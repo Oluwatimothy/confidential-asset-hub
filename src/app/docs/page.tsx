@@ -10,9 +10,9 @@ import { Card, CardContent, Separator } from '@/components/ui';
 import { cn } from '@/utils';
 
 interface DocSection {
-  id:       string;
-  title:    string;
-  content:  React.ReactNode;
+  id: string;
+  title: string;
+  content: React.ReactNode;
 }
 
 function AccordionItem({ section }: { section: DocSection }) {
@@ -51,7 +51,7 @@ const Code = ({ children }: { children: React.ReactNode }) => (
 
 const SECTIONS: DocSection[] = [
   {
-    id:    'overview',
+    id: 'overview',
     title: 'What is Confidential Asset Hub?',
     content: (
       <div className="space-y-2">
@@ -68,7 +68,7 @@ const SECTIONS: DocSection[] = [
     ),
   },
   {
-    id:    'erc7984',
+    id: 'erc7984',
     title: 'What is ERC7984?',
     content: (
       <div className="space-y-2">
@@ -87,7 +87,7 @@ const SECTIONS: DocSection[] = [
     ),
   },
   {
-    id:    'wrap-flow',
+    id: 'wrap-flow',
     title: 'How does wrapping work?',
     content: (
       <div className="space-y-2">
@@ -103,7 +103,7 @@ const SECTIONS: DocSection[] = [
     ),
   },
   {
-    id:    'unwrap-flow',
+    id: 'unwrap-flow',
     title: 'How does unwrapping work?',
     content: (
       <div className="space-y-2">
@@ -126,7 +126,7 @@ const SECTIONS: DocSection[] = [
     ),
   },
   {
-    id:    'decrypt-flow',
+    id: 'decrypt-flow',
     title: 'How does balance decryption work?',
     content: (
       <div className="space-y-2">
@@ -145,7 +145,7 @@ const SECTIONS: DocSection[] = [
     ),
   },
   {
-    id:    'registry',
+    id: 'registry',
     title: 'How does the registry work?',
     content: (
       <div className="space-y-2">
@@ -162,7 +162,7 @@ const SECTIONS: DocSection[] = [
     ),
   },
   {
-    id:    'faucet',
+    id: 'faucet',
     title: 'How does the faucet work?',
     content: (
       <p>
@@ -174,22 +174,30 @@ const SECTIONS: DocSection[] = [
     ),
   },
   {
-    id:    'custom-pairs',
+    id: 'custom-pairs',
     title: 'How do I add a custom pair?',
     content: (
       <div className="space-y-2">
-        <p>Use the <strong className="text-zinc-200">Add Custom Pair</strong> wizard (sidebar), or edit directly:</p>
+        <p>You can add a custom pair in two ways.</p>
+        <p className="text-zinc-300 font-medium mt-3">1. Add it locally (fastest, only visible to you)</p>
         <ol className="list-decimal list-inside space-y-1.5 text-zinc-400">
-          <li>Open <Code>src/config/custom-pairs.ts</Code>.</li>
+          <li>Open the <strong className="text-zinc-200">Add Custom Pair</strong> page (sidebar).</li>
+          <li>Paste a valid ERC7984 confidential token address into the <strong className="text-zinc-200">Add Custom Pair Locally</strong> section.</li>
+          <li>The underlying ERC20 address, name, symbol, decimals, and wrap rate are all read directly from the contract, nothing else to fill in.</li>
+          <li>Click <strong className="text-zinc-200">Add Locally</strong>. The pair appears immediately in Registry Explorer, Portfolio, Wrap Center, Unwrap Center, and Decrypt Balance, stored only in your browser, removable anytime.</li>
+        </ol>
+        <p className="text-zinc-300 font-medium mt-3">2. Add it as a dev custom pair (visible to everyone)</p>
+        <ol className="list-decimal list-inside space-y-1.5 text-zinc-400">
+          <li>Use the <strong className="text-zinc-200">Dev Custom Pair</strong> wizard on the same page, or open <Code>src/config/custom-pairs.ts</Code> directly.</li>
           <li>Add an entry to the <Code>CUSTOM_PAIRS</Code> array following the example structure.</li>
-          <li>Rebuild the app (<Code>npm run build</Code>).</li>
-          <li>The pair appears in Registry Explorer, Portfolio, Wrap Center, and Unwrap Center.</li>
+          <li>Commit the change and push to main if you maintain this repo, or open a pull request if you don't.</li>
+          <li>Once merged, Vercel automatically redeploys, no manual build step needed, and the pair appears in Registry Explorer, Portfolio, Wrap Center, and Unwrap Center for every visitor.</li>
         </ol>
       </div>
     ),
   },
   {
-    id:    'sdk',
+    id: 'sdk',
     title: 'Which SDKs are used?',
     content: (
       <div className="space-y-2">
@@ -204,7 +212,7 @@ const SECTIONS: DocSection[] = [
     ),
   },
   {
-    id:    'security',
+    id: 'security',
     title: 'Security considerations',
     content: (
       <div className="space-y-2">
@@ -222,11 +230,11 @@ const SECTIONS: DocSection[] = [
 ];
 
 const LINKS = [
-  { label: 'Zama Protocol Docs',        href: 'https://docs.zama.org/protocol' },
-  { label: 'FHEVM Documentation',       href: 'https://docs.zama.org/fhevm' },
-  { label: 'ERC-7984 Specification',    href: 'https://eips.ethereum.org/EIPS/eip-7984' },
-  { label: 'Zama GitHub',               href: 'https://github.com/zama-ai' },
-  { label: 'Official Wrappers Registry',href: 'https://github.com/zama-ai/protocol-apps' },
+  { label: 'Zama Protocol Docs', href: 'https://docs.zama.org/protocol' },
+  { label: 'FHEVM Documentation', href: 'https://docs.zama.org/fhevm' },
+  { label: 'ERC-7984 Specification', href: 'https://eips.ethereum.org/EIPS/eip-7984' },
+  { label: 'Zama GitHub', href: 'https://github.com/zama-ai' },
+  { label: 'Official Wrappers Registry', href: 'https://github.com/zama-ai/protocol-apps' },
 ];
 
 export default function DocsPage() {

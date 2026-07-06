@@ -28,23 +28,25 @@ export default function AnalyticsPage() {
 
   const chainPairs = pairs.filter((p) => p.chainId === chainId);
 
-  const validPairs    = chainPairs.filter((p) => p.isValid).length;
-  const revokedPairs  = chainPairs.filter((p) => !p.isValid).length;
+  const validPairs = chainPairs.filter((p) => p.isValid).length;
+  const revokedPairs = chainPairs.filter((p) => !p.isValid).length;
   const officialPairs = chainPairs.filter((p) => p.source === 'official').length;
-  const customPairs   = chainPairs.filter((p) => p.source === 'custom').length;
+  const customPairs = chainPairs.filter((p) => p.source === 'custom').length;
+  const localPairs = chainPairs.filter((p) => p.source === 'local').length;
 
   const pieData = [
     { name: 'Official', value: officialPairs },
-    { name: 'Custom',   value: customPairs   },
+    { name: 'Custom', value: customPairs },
+    { name: 'Local', value: localPairs },
   ].filter((d) => d.value > 0);
-
   const statusData = [
-    { name: 'Valid',    value: validPairs   },
-    { name: 'Revoked',  value: revokedPairs },
+    { name: 'Valid', value: validPairs },
+    { name: 'Revoked', value: revokedPairs },
   ].filter((d) => d.value > 0);
 
   // Tx distribution
-  const txTypes = ['wrap', 'unwrap', 'decrypt', 'faucet', 'approval'] as const;
+  const txTypes = ['wrap', 'unwrap', 'transfer', 'decrypt', 'faucet', 'approval'] as const;
+
   const txData = txTypes.map((t) => ({
     name: t.charAt(0).toUpperCase() + t.slice(1),
     count: records.filter((r) => r.type === t).length,
@@ -77,10 +79,10 @@ export default function AnalyticsPage() {
       {/* Summary stats */}
       <div className="grid grid-cols-2 lg:grid-cols-4 gap-4">
         {[
-          { label: 'Total Pairs',    value: chainPairs.length,  accent: true  },
-          { label: 'Valid Pairs',    value: validPairs,         accent: false },
-          { label: 'Unique Tokens',  value: uniqueTokens,       accent: false },
-          { label: 'Tx This Session',value: records.length,     accent: false },
+          { label: 'Total Pairs', value: chainPairs.length, accent: true },
+          { label: 'Valid Pairs', value: validPairs, accent: false },
+          { label: 'Unique Tokens', value: uniqueTokens, accent: false },
+          { label: 'Tx This Session', value: records.length, accent: false },
         ].map((stat, i) => (
           <motion.div
             key={i}
@@ -206,10 +208,10 @@ export default function AnalyticsPage() {
         </CardHeader>
         <CardContent className="space-y-3">
           {[
-            { label: 'Sync status',       value: isSyncing ? 'Syncing…' : lastSyncedAt ? `Last synced ${timeAgo(lastSyncedAt)}` : 'Not synced', ok: !!lastSyncedAt },
-            { label: 'Valid pair ratio',   value: chainPairs.length ? `${Math.round((validPairs / chainPairs.length) * 100)}%` : 'N/A', ok: validPairs === chainPairs.length },
-            { label: 'Official source',    value: `${officialPairs} / ${chainPairs.length}`, ok: officialPairs > 0 },
-            { label: 'Registry contract',  value: 'UUPS Upgradeable proxy', ok: true },
+            { label: 'Sync status', value: isSyncing ? 'Syncing…' : lastSyncedAt ? `Last synced ${timeAgo(lastSyncedAt)}` : 'Not synced', ok: !!lastSyncedAt },
+            { label: 'Valid pair ratio', value: chainPairs.length ? `${Math.round((validPairs / chainPairs.length) * 100)}%` : 'N/A', ok: validPairs === chainPairs.length },
+            { label: 'Official source', value: `${officialPairs} / ${chainPairs.length}`, ok: officialPairs > 0 },
+            { label: 'Registry contract', value: 'UUPS Upgradeable proxy', ok: true },
           ].map((row) => (
             <div key={row.label} className="flex items-center justify-between py-1.5 border-b border-zinc-800 last:border-0">
               <span className="text-sm text-zinc-400">{row.label}</span>
