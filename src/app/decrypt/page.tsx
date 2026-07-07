@@ -415,28 +415,46 @@ function AllResults() {
 
 function DecryptAllPanel({ pairs, onSuccess }: { pairs: RegistryPair[]; onSuccess: () => void }) {
   const { address } = useAccount();
-  const { mutateAsync: grantPermitAll, isPending: granting } = useGrantPermit();
-  const [status, setStatus] = useState<'idle' | 'success' | 'error'>('idle');
+  const { isSepolia } = useNetwork();
+  const { mutateAsync: grantPermit } = useGrantPermit();
+  const [status, setStatus] = useState<'idle' | 'signing' | 'success' | 'error'>('idle');
   const [errorMsg, setErrorMsg] = useState('');
+  const [progress, setProgress] = useState({ done: 0, total: 0 });
 
   async function handleDecryptAll() {
     if (!address || pairs.length === 0) return;
-    setStatus('idle');
-    setErrorMsg('');
-    try {
-      // One EIP-712 signature covering every registry confidential token
-      // address at once, this is the same batch-capable grantPermit already
-      // used everywhere else in the app for a single address, just given
-      // the full list instead. It does not touch or affect the individual
-      // per-token Sign Permit & Decrypt flow below in any way.
-      const addresses = pairs.map((p) => p.confidentialToken.address);
-      await grantPermitAll(addresses);
-      setStatus('success');
-      onSuccess();
-    } catch (err) {
+    if (!isSepolia) {
       setStatus('error');
-      setErrorMsg((err as Error)?.message?.slice(0, 150) ?? 'Could not decrypt all balances.');
+      setErrorMsg('Decrypt only works on Sepolia right now. Switch to Sepolia above to decrypt.');
+      return;
     }
+    setStatus('signing');
+    setErrorMsg('');
+    setProgress({ done: 0, total: pairs.length });
+
+    // Zama's relayer appears to require an authenticated API key specifically
+    // for a single EIP-712 signature covering multiple contract addresses at
+    // once, this app doesn't have one, that's an external access-tier limit,
+    // not something fixable here. A single-address permit works fine though,
+    // so this signs one per token, in sequence, instead of one for everyone.
+    let failures = 0;
+    for (const pair of pairs) {
+      try {
+        await grantPermit([pair.confidentialToken.address]);
+      } catch {
+        failures += 1;
+      }
+      setProgress((p) => ({ ...p, done: p.done + 1 }));
+    }
+
+    if (failures === pairs.length) {
+      setStatus('error');
+      setErrorMsg('Could not decrypt any balances. Check your wallet is connected and try again.');
+      return;
+    }
+
+    setStatus('success');
+    onSuccess();
   }
 
   if (pairs.length === 0) return null;
@@ -446,13 +464,15 @@ function DecryptAllPanel({ pairs, onSuccess }: { pairs: RegistryPair[]; onSucces
       <div className="text-xs text-zinc-400 min-w-0">
         <p className="font-medium text-amber-400">Decrypt all balances</p>
         <p className="mt-0.5">
-          One signature covers every registry token below, instead of signing once per token.
+          {status === 'signing'
+            ? `Signing permit ${progress.done + 1} of ${progress.total}, one signature per token…`
+            : 'Signs a permit for each registry token below, one at a time.'}
         </p>
         {status === 'error' && <p className="text-red-400 mt-1">{errorMsg}</p>}
         {status === 'success' && <p className="text-emerald-400 mt-1">Signed, balances below are decrypting…</p>}
       </div>
-      <Button size="sm" onClick={handleDecryptAll} isLoading={granting} disabled={granting}>
-        {granting ? 'Sign in wallet…' : 'Decrypt All'}
+      <Button size="sm" onClick={handleDecryptAll} isLoading={status === 'signing'} disabled={status === 'signing' || !isSepolia}>
+        {status === 'signing' ? `Signing… (${progress.done}/${progress.total})` : 'Decrypt All'}
       </Button>
     </div>
   );
