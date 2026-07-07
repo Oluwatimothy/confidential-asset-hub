@@ -30,6 +30,7 @@ function isRealBalance(val: bigint | undefined): val is bigint {
 
 function TokenDecryptCard({ pair }: { pair: RegistryPair }) {
   const { address } = useAccount();
+  const { isSepolia } = useNetwork();
   const { setResult } = useDecryptStore();
   const contractAddress = pair.confidentialToken.address;
 
@@ -43,6 +44,7 @@ function TokenDecryptCard({ pair }: { pair: RegistryPair }) {
     error: grantError,
     reset: resetGrant,
   } = useGrantPermit();
+  const [networkError, setNetworkError] = useState('');
 
   const {
     data: rawBalance,
@@ -74,6 +76,11 @@ function TokenDecryptCard({ pair }: { pair: RegistryPair }) {
   );
 
   async function handleGrantAndDecrypt() {
+    if (!isSepolia) {
+      setNetworkError('Decrypt only works on Sepolia right now. Switch to Sepolia above to decrypt.');
+      return;
+    }
+    setNetworkError('');
     try {
       resetGrant();
       await grantPermit([contractAddress]);
@@ -100,7 +107,7 @@ function TokenDecryptCard({ pair }: { pair: RegistryPair }) {
     }
   }
 
-  const error = grantError || balanceError;
+  const error = networkError || grantError || balanceError;
   const isLoading = granting || balanceLoading;
 
   // Only show a balance (live or cached) if a permit currently exists.
@@ -167,9 +174,9 @@ function TokenDecryptCard({ pair }: { pair: RegistryPair }) {
             className="w-full"
             onClick={handleGrantAndDecrypt}
             isLoading={isLoading}
-            disabled={!address || isLoading}
+            disabled={!address || isLoading || !isSepolia}
           >
-            {granting ? 'Sign in wallet…' : balanceLoading ? 'Decrypting…' : 'Sign Permit & Decrypt'}
+            {!isSepolia ? 'Switch to Sepolia to decrypt' : granting ? 'Sign in wallet…' : balanceLoading ? 'Decrypting…' : 'Sign Permit & Decrypt'}
           </Button>
         </div>
       )}
@@ -177,7 +184,7 @@ function TokenDecryptCard({ pair }: { pair: RegistryPair }) {
       {error && (
         <div className="flex items-start gap-2 rounded-lg border border-red-500/30 bg-red-500/5 p-3">
           <AlertCircle className="h-4 w-4 text-red-400 shrink-0 mt-0.5" />
-          <p className="text-xs text-red-400">{(error as Error).message?.slice(0, 120)}</p>
+          <p className="text-xs text-red-400">{(typeof error === 'string' ? error : (error as Error).message)?.slice(0, 160)}</p>
         </div>
       )}
     </div>
@@ -186,9 +193,11 @@ function TokenDecryptCard({ pair }: { pair: RegistryPair }) {
 
 function PasteDecrypt() {
   const { address } = useAccount();
+  const { isSepolia } = useNetwork();
   const [addr, setAddr] = useState('');
   const [addrError, setAddrError] = useState('');
   const [submitted, setSubmitted] = useState<Address | null>(null);
+  const [networkErrorMsg, setNetworkErrorMsg] = useState('');
 
   const { data: tokenName } = useReadContract({
     address: submitted ?? '0x0000000000000000000000000000000000000000',
@@ -262,6 +271,11 @@ function PasteDecrypt() {
 
   async function handleGrantAndDecrypt() {
     if (!submitted) return;
+    if (!isSepolia) {
+      setNetworkErrorMsg('Decrypt only works on Sepolia. Zama\'s Mainnet relayer requires an authenticated API key this app does not have. Switch to Sepolia to decrypt.');
+      return;
+    }
+    setNetworkErrorMsg('');
     try {
       await grantPermit([submitted]);
       await recheckPermit();
@@ -369,10 +383,14 @@ function PasteDecrypt() {
                 className="w-full"
                 onClick={handleGrantAndDecrypt}
                 isLoading={granting || balanceLoading}
-                disabled={!address}
+                disabled={!address || !isSepolia}
               >
                 {granting ? 'Sign in wallet…' : 'Sign Permit & Decrypt'}
               </Button>
+            )}
+
+            {networkErrorMsg && (
+              <p className="text-xs text-red-400">{networkErrorMsg}</p>
             )}
 
             {grantError && (
