@@ -11,6 +11,7 @@ import { web } from '@zama-fhe/sdk/web';
 import { sepolia, mainnet } from '@zama-fhe/sdk/chains';
 import { IdleDisconnect } from '@/components/IdleDisconnect';
 import { WalletResetWatcher } from '@/components/WalletResetWatcher';
+import { ZamaWarmup } from '@/components/ZamaWarmup';
 
 import '@rainbow-me/rainbowkit/styles.css';
 
@@ -64,6 +65,7 @@ export function Providers({ children }: { children: React.ReactNode }) {
       <QueryClientProvider client={queryClient}>
         <RainbowKitProvider theme={rainbowTheme} initialChain={11155111}>
           <ZamaProvider config={zamaConfig}>
+            <ZamaWarmup />
             {children}
             <IdleDisconnect />
             <WalletResetWatcher />
