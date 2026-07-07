@@ -37,17 +37,17 @@ const schema = z.object({
     .string()
     .min(1, 'Required')
     .refine(isValidAddress, 'Not a valid Ethereum address'),
-  name:     z.string().min(1, 'Required').max(64),
-  symbol:   z.string().min(1, 'Required').max(16),
+  name: z.string().min(1, 'Required').max(64),
+  symbol: z.string().min(1, 'Required').max(16),
   decimals: z.coerce.number().int().min(0).max(18),
-  notes:    z.string().max(256).optional(),
+  notes: z.string().max(256).optional(),
 });
 
 type FormValues = z.infer<typeof schema>;
 
 type WizardStep = 'form' | 'confirm' | 'success';
 
-// ── Add Custom Pair Locally ─────────────────────────────────────
+// ── Method 1: Add Custom Pair Locally ────────────────────────────
 function LocalCustomPairSection() {
   const { chainId } = useNetwork();
   const { pairs: onChainPairs } = useRegistryStore();
@@ -162,11 +162,15 @@ function LocalCustomPairSection() {
   return (
     <div className="space-y-4">
       <div>
-        <h3 className="text-sm font-semibold text-zinc-300">Add Custom Pair Locally</h3>
-        <p className="text-xs text-zinc-500 mt-0.5">
-          Add a local custom pair that can be decrypted, transferred, wrapped, and unwrapped
-          locally in your browser. Nothing is sent anywhere, it's stored only on this device,
-          it persists across page refreshes, and you can remove it at any time.
+        <div className="flex items-center gap-2">
+          <Badge variant="secondary">Method 1</Badge>
+          <h3 className="text-sm font-semibold text-zinc-300">Add Custom Pair Locally</h3>
+        </div>
+        <p className="text-xs text-zinc-500 mt-1">
+          Fastest option. Paste an ERC7984 address, it's validated on-chain and added instantly —
+          decryptable, transferable, wrappable, and unwrappable right away. It's stored only on
+          this device, persists across page refreshes, is visible only to you, and can be removed
+          at any time.
         </p>
       </div>
 
@@ -262,7 +266,7 @@ function LocalCustomPairSection() {
 
 export default function AddPairPage() {
   const { chainId } = useNetwork();
-  const { pairs }   = useRegistryStore();
+  const { pairs } = useRegistryStore();
 
   const [wizardStep, setWizardStep] = useState<WizardStep>('form');
   const [pendingEntry, setPendingEntry] = useState<CustomPairEntry | null>(null);
@@ -303,21 +307,21 @@ export default function AddPairPage() {
 
     const entry: CustomPairEntry = {
       token: {
-        address:  data.erc20Address as `0x${string}`,
-        name:     data.name,
-        symbol:   data.symbol,
+        address: data.erc20Address as `0x${string}`,
+        name: data.name,
+        symbol: data.symbol,
         decimals: data.decimals,
       },
       confidentialToken: {
-        address:  data.erc7984Address as `0x${string}`,
-        name:     `Confidential ${data.name}`,
-        symbol:   `c${data.symbol}`,
+        address: data.erc7984Address as `0x${string}`,
+        name: `Confidential ${data.name}`,
+        symbol: `c${data.symbol}`,
         decimals: data.decimals,
       },
-      rate:     1n,
-      chainId:  chainId as SupportedChainId,
-      notes:    data.notes,
-      addedAt:  Date.now(),
+      rate: 1n,
+      chainId: chainId as SupportedChainId,
+      notes: data.notes,
+      addedAt: Date.now(),
     };
 
     setPendingEntry(entry);
@@ -363,17 +367,22 @@ export default function AddPairPage() {
       <div>
         <h2 className="text-xl font-bold text-zinc-100">Add Custom Pair</h2>
         <p className="text-sm text-zinc-500 mt-1">
-          Register an ERC20 ↔ ERC7984 pair that isn't in the official on-chain registry.
+          There are two ways to add an ERC20 ↔ ERC7984 pair that isn't in the official
+          on-chain registry — Method 1, added locally in your browser, or Method 2,
+          added to the codebase for everyone.
         </p>
       </div>
 
       <LocalCustomPairSection />
 
       <div className="pt-2">
-        <h3 className="text-sm font-semibold text-zinc-300">Dev Custom Pair</h3>
-        <p className="text-xs text-zinc-500 mt-0.5">
-          For the project maintainer. Requires a code change and a redeploy, but once live,
-          it appears for every visitor of this app, not just your own browser.
+        <div className="flex items-center gap-2">
+          <Badge variant="secondary">Method 2</Badge>
+          <h3 className="text-sm font-semibold text-zinc-300">Dev Custom Pair</h3>
+        </div>
+        <p className="text-xs text-zinc-500 mt-1">
+          For the project maintainer. Slower — requires a code change and a redeploy — but
+          once live, it appears for every visitor of this app, not just your own browser.
         </p>
       </div>
 
@@ -381,7 +390,7 @@ export default function AddPairPage() {
         <div className="flex items-start gap-3">
           <Info className="h-4 w-4 text-amber-400 shrink-0 mt-0.5" />
           <div className="space-y-1 text-xs text-zinc-400 leading-relaxed">
-            <p className="font-medium text-amber-400">How dev custom pairs work</p>
+            <p className="font-medium text-amber-400">How Method 2 (dev custom pairs) works</p>
             <p>
               Custom pairs live in <code className="font-data text-amber-400/70">src/config/custom-pairs.ts</code>{' '}
               and are merged with the official on-chain registry at build time.
@@ -497,12 +506,12 @@ export default function AddPairPage() {
               >
                 <div className="space-y-2">
                   {[
-                    { label: 'ERC20 Address',   value: pendingEntry.token.address       },
-                    { label: 'ERC7984 Address',  value: pendingEntry.confidentialToken.address },
-                    { label: 'Name',             value: pendingEntry.token.name          },
-                    { label: 'Symbol',           value: pendingEntry.token.symbol        },
-                    { label: 'Decimals',         value: pendingEntry.token.decimals.toString() },
-                    { label: 'Chain',            value: `Chain ID ${pendingEntry.chainId}` },
+                    { label: 'ERC20 Address', value: pendingEntry.token.address },
+                    { label: 'ERC7984 Address', value: pendingEntry.confidentialToken.address },
+                    { label: 'Name', value: pendingEntry.token.name },
+                    { label: 'Symbol', value: pendingEntry.token.symbol },
+                    { label: 'Decimals', value: pendingEntry.token.decimals.toString() },
+                    { label: 'Chain', value: `Chain ID ${pendingEntry.chainId}` },
                   ].map((row) => (
                     <div key={row.label} className="flex items-start justify-between gap-3 py-1.5 border-b border-zinc-800">
                       <span className="text-xs text-zinc-500 shrink-0 w-32">{row.label}</span>
