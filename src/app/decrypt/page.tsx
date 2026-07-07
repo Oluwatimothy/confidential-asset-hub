@@ -30,7 +30,6 @@ function isRealBalance(val: bigint | undefined): val is bigint {
 
 function TokenDecryptCard({ pair }: { pair: RegistryPair }) {
   const { address } = useAccount();
-  const { isSepolia } = useNetwork();
   const { setResult } = useDecryptStore();
   const contractAddress = pair.confidentialToken.address;
 
@@ -44,7 +43,6 @@ function TokenDecryptCard({ pair }: { pair: RegistryPair }) {
     error: grantError,
     reset: resetGrant,
   } = useGrantPermit();
-  const [networkError, setNetworkError] = useState('');
 
   const {
     data: rawBalance,
@@ -76,11 +74,6 @@ function TokenDecryptCard({ pair }: { pair: RegistryPair }) {
   );
 
   async function handleGrantAndDecrypt() {
-    if (!isSepolia) {
-      setNetworkError('Decrypt only works on Sepolia right now. Switch to Sepolia above to decrypt.');
-      return;
-    }
-    setNetworkError('');
     try {
       resetGrant();
       await grantPermit([contractAddress]);
@@ -107,7 +100,7 @@ function TokenDecryptCard({ pair }: { pair: RegistryPair }) {
     }
   }
 
-  const error = networkError || grantError || balanceError;
+  const error = grantError || balanceError;
   const isLoading = granting || balanceLoading;
 
   // Only show a balance (live or cached) if a permit currently exists.
@@ -174,9 +167,9 @@ function TokenDecryptCard({ pair }: { pair: RegistryPair }) {
             className="w-full"
             onClick={handleGrantAndDecrypt}
             isLoading={isLoading}
-            disabled={!address || isLoading || !isSepolia}
+            disabled={!address || isLoading}
           >
-            {!isSepolia ? 'Switch to Sepolia to decrypt' : granting ? 'Sign in wallet…' : balanceLoading ? 'Decrypting…' : 'Sign Permit & Decrypt'}
+            {granting ? 'Sign in wallet…' : balanceLoading ? 'Decrypting…' : 'Sign Permit & Decrypt'}
           </Button>
         </div>
       )}
@@ -184,7 +177,7 @@ function TokenDecryptCard({ pair }: { pair: RegistryPair }) {
       {error && (
         <div className="flex items-start gap-2 rounded-lg border border-red-500/30 bg-red-500/5 p-3">
           <AlertCircle className="h-4 w-4 text-red-400 shrink-0 mt-0.5" />
-          <p className="text-xs text-red-400">{(typeof error === 'string' ? error : (error as Error).message)?.slice(0, 160)}</p>
+          <p className="text-xs text-red-400">{(error as Error).message?.slice(0, 120)}</p>
         </div>
       )}
     </div>
@@ -193,11 +186,9 @@ function TokenDecryptCard({ pair }: { pair: RegistryPair }) {
 
 function PasteDecrypt() {
   const { address } = useAccount();
-  const { isSepolia } = useNetwork();
   const [addr, setAddr] = useState('');
   const [addrError, setAddrError] = useState('');
   const [submitted, setSubmitted] = useState<Address | null>(null);
-  const [networkErrorMsg, setNetworkErrorMsg] = useState('');
 
   const { data: tokenName } = useReadContract({
     address: submitted ?? '0x0000000000000000000000000000000000000000',
@@ -271,11 +262,6 @@ function PasteDecrypt() {
 
   async function handleGrantAndDecrypt() {
     if (!submitted) return;
-    if (!isSepolia) {
-      setNetworkErrorMsg('Decrypt only works on Sepolia. Zama\'s Mainnet relayer requires an authenticated API key this app does not have. Switch to Sepolia to decrypt.');
-      return;
-    }
-    setNetworkErrorMsg('');
     try {
       await grantPermit([submitted]);
       await recheckPermit();
@@ -383,14 +369,10 @@ function PasteDecrypt() {
                 className="w-full"
                 onClick={handleGrantAndDecrypt}
                 isLoading={granting || balanceLoading}
-                disabled={!address || !isSepolia}
+                disabled={!address}
               >
                 {granting ? 'Sign in wallet…' : 'Sign Permit & Decrypt'}
               </Button>
-            )}
-
-            {networkErrorMsg && (
-              <p className="text-xs text-red-400">{networkErrorMsg}</p>
             )}
 
             {grantError && (
@@ -433,46 +415,28 @@ function AllResults() {
 
 function DecryptAllPanel({ pairs, onSuccess }: { pairs: RegistryPair[]; onSuccess: () => void }) {
   const { address } = useAccount();
-  const { isSepolia } = useNetwork();
-  const { mutateAsync: grantPermit } = useGrantPermit();
-  const [status, setStatus] = useState<'idle' | 'signing' | 'success' | 'error'>('idle');
+  const { mutateAsync: grantPermitAll, isPending: granting } = useGrantPermit();
+  const [status, setStatus] = useState<'idle' | 'success' | 'error'>('idle');
   const [errorMsg, setErrorMsg] = useState('');
-  const [progress, setProgress] = useState({ done: 0, total: 0 });
 
   async function handleDecryptAll() {
     if (!address || pairs.length === 0) return;
-    if (!isSepolia) {
-      setStatus('error');
-      setErrorMsg('Decrypt only works on Sepolia right now. Switch to Sepolia above to decrypt.');
-      return;
-    }
-    setStatus('signing');
+    setStatus('idle');
     setErrorMsg('');
-    setProgress({ done: 0, total: pairs.length });
-
-    // Zama's relayer appears to require an authenticated API key specifically
-    // for a single EIP-712 signature covering multiple contract addresses at
-    // once, this app doesn't have one, that's an external access-tier limit,
-    // not something fixable here. A single-address permit works fine though,
-    // so this signs one per token, in sequence, instead of one for everyone.
-    let failures = 0;
-    for (const pair of pairs) {
-      try {
-        await grantPermit([pair.confidentialToken.address]);
-      } catch {
-        failures += 1;
-      }
-      setProgress((p) => ({ ...p, done: p.done + 1 }));
-    }
-
-    if (failures === pairs.length) {
+    try {
+      // One EIP-712 signature covering every registry confidential token
+      // address at once, this is the same batch-capable grantPermit already
+      // used everywhere else in the app for a single address, just given
+      // the full list instead. It does not touch or affect the individual
+      // per-token Sign Permit & Decrypt flow below in any way.
+      const addresses = pairs.map((p) => p.confidentialToken.address);
+      await grantPermitAll(addresses);
+      setStatus('success');
+      onSuccess();
+    } catch (err) {
       setStatus('error');
-      setErrorMsg('Could not decrypt any balances. Check your wallet is connected and try again.');
-      return;
+      setErrorMsg((err as Error)?.message?.slice(0, 150) ?? 'Could not decrypt all balances.');
     }
-
-    setStatus('success');
-    onSuccess();
   }
 
   if (pairs.length === 0) return null;
@@ -482,15 +446,13 @@ function DecryptAllPanel({ pairs, onSuccess }: { pairs: RegistryPair[]; onSucces
       <div className="text-xs text-zinc-400 min-w-0">
         <p className="font-medium text-amber-400">Decrypt all balances</p>
         <p className="mt-0.5">
-          {status === 'signing'
-            ? `Signing permit ${progress.done + 1} of ${progress.total}, one signature per token…`
-            : 'Signs a permit for each registry token below, one at a time.'}
+          One signature covers every registry token below, instead of signing once per token.
         </p>
         {status === 'error' && <p className="text-red-400 mt-1">{errorMsg}</p>}
         {status === 'success' && <p className="text-emerald-400 mt-1">Signed, balances below are decrypting…</p>}
       </div>
-      <Button size="sm" onClick={handleDecryptAll} isLoading={status === 'signing'} disabled={status === 'signing' || !isSepolia}>
-        {status === 'signing' ? `Signing… (${progress.done}/${progress.total})` : 'Decrypt All'}
+      <Button size="sm" onClick={handleDecryptAll} isLoading={granting} disabled={granting}>
+        {granting ? 'Sign in wallet…' : 'Decrypt All'}
       </Button>
     </div>
   );
