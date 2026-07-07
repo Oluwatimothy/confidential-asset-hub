@@ -1,6 +1,6 @@
 # Confidential Asset Hub
 
-A web application for the Zama Wrappers Registry ecosystem. It lets a user connect a wallet, browse the official ERC20 to ERC7984 wrapper pairs on Sepolia, wrap and unwrap between them, decrypt any ERC7984 balance using EIP-712 user decryption, transfer confidential registry tokens, and claim testnet tokens from a faucet.
+A web application for the Zama Wrappers Registry ecosystem. It lets a user connect a wallet, browse the official ERC20 to ERC7984 wrapper pairs on Sepolia, wrap and unwrap between them, decrypt any ERC7984 balance using EIP-712 user decryption, transfer confidential registry tokens, claim testnet tokens from a faucet, and extend the registry with their own pairs either instantly and locally or permanently for everyone.
 
 [![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](https://opensource.org/licenses/MIT)
 [![Built with Next.js](https://img.shields.io/badge/Next.js-15-black)](https://nextjs.org)
@@ -18,14 +18,18 @@ This app is a usable product built directly on top of that registry, so wrapping
 
 ## Features
 
-* Registry Explorer that reads the on chain Wrappers Registry and renders every pair with live token metadata
-* Wrap: convert a registry ERC20 into its ERC7984 confidential equivalent
-* Unwrap: convert an ERC7984 confidential token back to its ERC20 equivalent, including the finalize step once the Zama network has decrypted the request
-* Decrypt: reveal your own balance of any ERC7984 token via EIP-712 user decryption, either from the registry list or by pasting an arbitrary ERC7984 contract address
-* Transfer: send a registry confidential token to another address once your balance is decrypted
-* Faucet: claim each official Sepolia cTokenMock listed in the registry
-* Portfolio view across all registry pairs
-* A working network guard: connecting on any chain other than Sepolia shows a banner with a one click switch action, instead of silently failing
+* **Registry Explorer** that reads the on chain Wrappers Registry and renders every pair with live token metadata and a recognizable logo per token
+* **Wrap**: convert a registry ERC20 into its ERC7984 confidential equivalent, with exact-amount approvals, never an unlimited allowance
+* **Unwrap**: convert an ERC7984 confidential token back to its ERC20 equivalent, including the finalize step once the Zama network has decrypted the request, with built in recovery if a browser tab is closed or refreshed mid-flow (see Error recovery below)
+* **Decrypt**: reveal your own balance of any ERC7984 token via EIP-712 user decryption, either from the registry list or by pasting an arbitrary ERC7984 contract address, plus a Decrypt All action that covers every registry token in a single signature instead of one per token
+* **Transfer**: send a registry confidential token to another address once your balance is decrypted, with a clear progress state while the amount is encrypted client side and the wallet is prompted to sign
+* **Faucet**: claim each official Sepolia cTokenMock listed in the registry
+* **Portfolio**: holdings across every registry pair, both official and custom
+* **Analytics**: session level breakdown of registry composition (official, dev custom, local custom), pair validity, and transaction activity by type
+* **Two ways to extend the registry**: add a pair locally in your own browser in seconds, or contribute a pair permanently for every user (see Adding a new pair below)
+* **Network guard**: connecting on any chain other than Sepolia shows a banner with a one click switch action on every page that needs contract access, instead of silently failing
+* **Idle wallet disconnect**: automatically disconnects after 30 minutes of inactivity, with a clear on screen notice explaining why
+* **Per-wallet session state**: transaction history, decrypted balance caches, and analytics reset automatically when you disconnect or switch to a different wallet, so one browser never shows a mix of two wallets' activity
 
 ## Supported network
 
@@ -36,13 +40,30 @@ Sepolia only. The app deliberately does not attempt Ethereum Mainnet. If a walle
 The registry is hybrid, combining two sources:
 
 1. The official on chain Wrappers Registry contract, read directly via viem. This is the primary source of truth.
-2. A local config file, `src/config/custom-pairs.ts`, for pairs that are not (yet) in the official registry: dev tokens, or pairs added ahead of an official listing.
+2. A local config file, `src/config/custom-pairs.ts`, for dev custom pairs: dev tokens, or pairs added ahead of an official listing, that ship with the deployed app.
 
-Both sources are fetched, merged, and deduplicated by chain ID and token address. When the same pair exists in both places, the official on chain entry always wins. The merged result is cached for five minutes via React Query and exposed through the `useRegistry()` hook, which every page (Wrap, Unwrap, Decrypt, Transfer, Portfolio) reads from.
+A third, entirely separate source exists only in the browser: pairs added through the in app "Add Custom Pair Locally" flow, stored in that browser's local storage only (see below).
+
+All applicable sources are fetched, merged, and deduplicated by chain ID and token address. When the same pair exists in more than one place, the official on chain entry always wins over dev custom, and both always win over a local pair. The merged result is cached for five minutes via React Query and exposed through the `useRegistry()` hook, which every page (Wrap, Unwrap, Decrypt, Transfer, Portfolio) reads from.
 
 ## Adding a new pair
 
-There is no admin UI or on chain registration flow for this; new pairs are added to the local config and shipped with the app. This keeps the mechanism simple, reviewable in a pull request, and clearly separated from the official registry.
+There are two ways to add a pair, depending on whether it should be visible to everyone or just to you.
+
+### 1. Add it locally (fastest, only visible to you)
+
+No code change, no redeploy, nothing sent anywhere.
+
+1. Open the **Add Custom Pair** page (sidebar).
+2. In the **Add Custom Pair Locally** section, paste a valid ERC7984 confidential token address.
+3. The app validates the contract on chain (an ERC7984 interface check), then reads its underlying ERC20 address, both tokens' name, symbol, and decimals, and the wrap rate, directly from the contracts. Nothing else needs to be filled in.
+4. Click **Add Locally**. The pair appears immediately in Registry Explorer, Portfolio, Wrap, Unwrap, Decrypt, and Transfer.
+
+This pair lives only in your browser's local storage. It persists across page refreshes, but not across browsers or devices, and can be removed at any time from the same page with one click.
+
+### 2. Add it as a dev custom pair (visible to everyone)
+
+This requires a code change and a redeploy, but once live, it appears for every visitor of the app, not just your own browser.
 
 1. Open `src/config/custom-pairs.ts`.
 2. Add an entry to the `CUSTOM_PAIRS` array:
@@ -71,9 +92,10 @@ export const CUSTOM_PAIRS: CustomPairEntry[] = [
 ];
 ```
 
-A note on `rate`: ERC7984 tokens always use 6 decimals. For an 18 decimal underlying token wrapped 1:1 in human terms, the rate is `10 ** (18 - 6)`, i.e. `1_000_000_000_000n`. For a 6 decimal underlying token, the rate is `1n`.
+A note on `rate`: ERC7984 tokens always use 6 decimals. For an 18 decimal underlying token wrapped 1:1 in human terms, the rate is `10 ** (18 - 6)`, i.e. `1_000_000_000_000n`. For a 6 decimal underlying token, the rate is `1n`. The **Add Custom Pair** wizard on the same page can generate this snippet for you from a pasted address, using the same on chain reads as the local flow above.
 
-3. Rebuild and redeploy. The pair then appears automatically in the Registry Explorer, Portfolio, Wrap, Unwrap, and Transfer pages, since all of them read from the same merged registry.
+3. Commit the change and push to main if you maintain this repository, or open a pull request against it if you don't.
+4. Once merged, Vercel automatically builds and redeploys, no manual build step required. The pair then appears in Registry Explorer, Portfolio, Wrap, Unwrap, and Transfer for every visitor.
 
 If a pair with the same `chainId` and token address is later added to the official on chain registry, that entry takes over automatically and the custom entry is ignored, so no cleanup is required.
 
@@ -81,53 +103,30 @@ If a pair with the same `chainId` and token address is later added to the offici
 
 ### Wrap
 
-The user picks a registry pair and an amount. The app checks the current ERC20 allowance for the wrapper contract; if it is insufficient, an approval transaction is sent for exactly the amount being wrapped, not an unlimited allowance. Once approved, the wrap transaction mints the confidential ERC7984 balance.
+The user picks a registry pair and an amount. The app checks the current ERC20 allowance for the wrapper contract; if it is insufficient, an approval transaction is sent for exactly the amount being wrapped, not an unlimited allowance. Once approved, the wrap transaction mints the confidential ERC7984 balance. Approval-related failures (insufficient allowance, including from contracts that revert with a custom error rather than a string reason) are caught and explained in plain language rather than surfacing a raw revert.
 
 ### Unwrap
 
 This is a two step process required by the confidential token design. First, an unwrap request burns the encrypted amount and emits a request ID. The Zama network then decrypts that request off chain. Once that resolves, a second, separate finalize transaction releases the underlying ERC20 to the recipient.
 
+**Error recovery**: because the two steps are separated by an off chain decryption delay, the app is built to survive a closed tab, a refresh, or a wallet switch in between:
+
+* Any unfinalized unwrap for the currently connected wallet is detected automatically on page load, both from local history and by scanning the chain directly for `UnwrapRequested` events with no matching `UnwrapFinalized` event, and offered with a one click **Resume Finalize** button.
+* If neither of those catches it (for example, the page was reloaded before the first transaction even finished submitting), a manual **paste transaction hash** option reads the real on chain receipt and extracts the request ID automatically, no need to dig through a block explorer by hand.
+* A finalize attempt that fails because the network hasn't finished decrypting yet is treated as retryable, with an explanation, rather than presented as a dead end.
+* Every recovery path checks that the connected wallet actually matches the original request's recipient before allowing a resume or finalize, so one wallet can never act on another wallet's pending unwrap even within the same browser.
+
 ### Decrypt
 
-Balances are stored on chain as ciphertext handles, not numbers, so nothing about them is visible from a block explorer. To reveal one, the wallet signs an EIP-712 permit (no gas cost), which authorizes the Zama relayer to re-encrypt the balance so only that wallet can read it. This works for any ERC7984 token, not only ones in the registry: the Decrypt page has a Paste Address mode that reads token metadata directly from a pasted contract and runs the same permit and decrypt flow against it.
+Balances are stored on chain as ciphertext handles, not numbers, so nothing about them is visible from a block explorer. To reveal one, the wallet signs an EIP-712 permit (no gas cost), which authorizes the Zama relayer to re-encrypt the balance so only that wallet can read it. This works for any ERC7984 token, not only ones in the registry: the Decrypt page has a Paste Address mode that reads token metadata directly from a pasted contract and runs the same permit and decrypt flow against it. A **Decrypt All** action requests a permit for every registry token in a single signature rather than one per token, without changing how the individual per-token flow behaves.
 
 ### Transfer
 
-Once a registry confidential token's balance has been decrypted (so the sender knows what they are working with), an amount and recipient can be entered and sent via `confidentialTransfer`. The transferred amount is encrypted client side before it reaches the chain.
+Once a registry confidential token's balance has been decrypted (so the sender knows what they are working with), an amount and recipient can be entered and sent via `confidentialTransfer`. The transferred amount is encrypted client side before it reaches the chain, and the button reflects that: it shows an encrypting state before the wallet prompt appears, since that step genuinely takes a moment, rather than looking frozen.
 
 ### Faucet
 
 Lists each official cTokenMock from the Sepolia registry and lets a connected wallet claim a fixed test amount of each.
-
-## Project structure
-
-```
-src/
-  app/                     Next.js App Router pages
-    page.tsx               Dashboard
-    registry/               Registry Explorer
-    portfolio/               Portfolio
-    wrap/                     Wrap
-    unwrap/                   Unwrap
-    decrypt/                  Decrypt (registry and paste address modes)
-    transfer/                 Transfer
-    faucet/                   Faucet
-    add-pair/                 Custom pair wizard
-    docs/                     In app documentation
-    api/rpc/[network]/        Server side RPC proxy
-    api/relayer/[...path]/    Server side relayer proxy
-  components/
-    ui/                      Shared UI primitives
-    layout/                  App shell, sidebar, providers
-    NetworkGuard.tsx         Wrong network banner and switch action
-  hooks/                    useRegistry, useNetwork, usePortfolio, useTokenMetadata
-  services/registry.ts      On chain registry read, merge, and dedup logic
-  contracts/                 ABIs: registry, ERC20, ERC7984
-  config/                    Chain IDs, contract addresses, custom pairs, faucet tokens
-  stores/                    Zustand stores (registry, decrypt results, transactions, faucet claims, UI)
-  types/                    Shared TypeScript types
-  utils/                    Formatting, validation, and error parsing helpers
-```
 
 ## Getting started
 
@@ -182,8 +181,10 @@ The official Sepolia cTokenMock addresses claimable from the faucet, and their c
 
 ## Security notes
 
-* All user supplied addresses (recipient in Transfer, pasted contract in Decrypt) are validated with viem's `isAddress` before use.
+* All user supplied addresses (recipient in Transfer, pasted contract in Decrypt and in Add Custom Pair Locally) are validated with viem's `isAddress`, and any pasted ERC7984 address is additionally checked against the real interface before being trusted.
 * Wrap approvals are for the exact amount being wrapped, never an unlimited allowance.
+* Every unwrap recovery path (automatic resume or manual paste-hash) verifies the connected wallet matches the original request's recipient before allowing a finalize, so one wallet cannot act on another's pending unwrap.
+* Locally added custom pairs are stored in the browser's local storage only; nothing is sent to a server or shared with other users.
 * RPC and relayer calls go through server side proxy routes, so no provider API key is exposed to the browser.
 * EIP-712 permit signing and balance decryption are handled by the Zama SDK (`@zama-fhe/react-sdk`); this app does not implement its own cryptography.
 
