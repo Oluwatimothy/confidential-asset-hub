@@ -176,6 +176,24 @@ export const CUSTOM_PAIRS: CustomPairEntry[] = [
     notes: '',
     addedAt: 1783417386415,
   },
+  {
+    token: {
+      address: '0x3D84Ac01F59BBcA7a0E32a976ca9D18140D679fF',
+      name: 'mine',
+      symbol: 'mine',
+      decimals: 6,
+    },
+    confidentialToken: {
+      address: '0x3D84Ac01F59BBcA7a0E32a976ca9D18140D679fF',
+      name: 'Confidential mine',
+      symbol: 'cmine',
+      decimals: 6,
+    },
+    rate: 1n,
+    chainId: 11155111,
+    notes: '',
+    addedAt: 1783417621275,
+  },
 ];
 
 export function buildCustomRegistryPairs(): RegistryPair[] {
