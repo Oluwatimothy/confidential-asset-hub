@@ -26,7 +26,7 @@ import { ConnectButton } from '@rainbow-me/rainbowkit';
 import { NetworkGuard } from '@/components/NetworkGuard';
 import { BalanceLabel } from '@/components/BalanceLabel';
 import { TokenIcon } from '@/components/TokenIcon';
-import { parseUnits } from 'viem';
+import { parseUnits, decodeEventLog } from 'viem';
 import type { RegistryPair } from '@/types';
 import type { Address } from 'viem';
 
@@ -35,6 +35,19 @@ function isRealBalance(val: bigint | undefined): val is bigint {
   return val !== undefined && val < MAX_REAL_BALANCE;
 }
 
+// Minimal ERC20 Transfer event, used only to recover the actual amount
+// returned when finalizing a resumed/manually-pasted unwrap that never
+// had a client-known plaintext amount.
+const ERC20_TRANSFER_EVENT = {
+  type: 'event',
+  name: 'Transfer',
+  inputs: [
+    { name: 'from', type: 'address', indexed: true },
+    { name: 'to', type: 'address', indexed: true },
+    { name: 'value', type: 'uint256', indexed: false },
+  ],
+} as const;
+
 type UnwrapStatus =
   | 'idle'
   | 'unwrapping'
@@ -42,6 +55,12 @@ type UnwrapStatus =
   | 'finalizing'
   | 'success'
   | 'error';
+
+type ResumeInfo = {
+  unwrapRequestId?: `0x${string}`;
+  unwrapTxHash?: string;
+  amount?: string;
+};
 
 function UnwrapForm({
   pair,
@@ -170,6 +189,35 @@ function UnwrapForm({
         unwrapRequestId,
       });
       setFinalizeTxHash(result.txHash);
+
+      // A resumed / manually-pasted unwrap never had a client-known plaintext
+      // amount to show in the success message below. Recover the real amount
+      // from the underlying ERC20's Transfer event in the finalize receipt —
+      // only when we don't already know it, so the normal flow is untouched.
+      if (!amount && address) {
+        const receiptLogs: any[] = (result as any)?.receipt?.logs ?? [];
+        for (const log of receiptLogs) {
+          if (log.address?.toLowerCase() !== pair.token.address.toLowerCase()) continue;
+          try {
+            const decoded: any = decodeEventLog({
+              abi: [ERC20_TRANSFER_EVENT],
+              data: log.data,
+              topics: log.topics,
+            });
+            if (
+              decoded.eventName === 'Transfer' &&
+              decoded.args?.to?.toLowerCase() === address.toLowerCase() &&
+              decoded.args?.value !== undefined
+            ) {
+              setAmount(formatTokenAmount(decoded.args.value, pair.token.decimals).replace(/,/g, ''));
+              break;
+            }
+          } catch {
+            // Not a Transfer log — ignore and keep scanning.
+          }
+        }
+      }
+
       if (unwrapTxHash) {
         updateTx(unwrapTxHash, { status: 'confirmed' });
       }
@@ -177,12 +225,6 @@ function UnwrapForm({
     } catch (err) {
       console.error('[finalize] failed:', err);
       const msg = parseContractError(err);
-      // Finalize can only succeed once Zama's network has actually decrypted
-      // the unwrap request off-chain. Right after step 1 (or right after a
-      // resume) that may not have happened yet, so treat any finalize
-      // failure as retryable rather than a dead end: keep the request alive
-      // and stay on the Finalize button instead of bouncing back to the
-      // amount-input screen, which would risk a second, duplicate unwrap.
       setStatus('awaiting-finalize');
       setErrorMsg(
         msg.includes('rejected')
@@ -203,11 +245,20 @@ function UnwrapForm({
     try {
       const client = getPublicClient(chainId);
       const receipt = await client.getTransactionReceipt({ hash: trimmed as `0x${string}` });
-      const event = findUnwrapRequested(receipt.logs);
+
+      // Only look at logs emitted by the currently selected pair's
+      // confidential token — otherwise an unwrap request for a different
+      // pair could get mistakenly loaded while a different pair is selected.
+      const pairLogs = receipt.logs.filter(
+        (log) => log.address.toLowerCase() === pair.confidentialToken.address.toLowerCase(),
+      );
+      const event = findUnwrapRequested(pairLogs);
       const requestId = event?.unwrapRequestId as `0x${string}` | undefined;
 
       if (!requestId) {
-        setManualError('No UnwrapRequested event found in that transaction. Make sure this is the unwrap transaction for ' + pair.confidentialToken.symbol + ', not the finalize transaction or a different token.');
+        setManualError(
+          'No UnwrapRequested event for ' + pair.confidentialToken.symbol + ' found in that transaction. Make sure this is the unwrap transaction for the pair currently selected above, not a different token or the finalize transaction.'
+        );
         setManualLoading(false);
         return;
       }
@@ -454,6 +505,7 @@ function UnwrapForm({
     </Card>
   );
 }
+
 function UnwrapPageInner() {
   const { isConnected, address: connectedAddress } = useAccount();
   const { chainId } = useNetwork();
@@ -467,9 +519,7 @@ function UnwrapPageInner() {
   );
   const [selectedPair, setSelectedPair] = useState<RegistryPair | null>(null);
   const [formKey, setFormKey] = useState(0);
-  const [resumeInfo, setResumeInfo] = useState<
-    { unwrapRequestId?: `0x${string}`; unwrapTxHash?: string; amount?: string } | undefined
-  >();
+  const [resumeInfo, setResumeInfo] = useState<ResumeInfo | undefined>();
 
   const localPendingUnwraps = records.filter(
     (r) =>
@@ -575,12 +625,7 @@ function UnwrapPageInner() {
                     <p className="text-sm font-medium text-zinc-200">
                       {record.amount ?? 'Amount hidden until finalized'} {record.tokenSymbol}
                     </p>
-                    <a
-                      href={getTxUrl(record.hash, chainId)}
-                      target="_blank"
-                      rel="noopener noreferrer"
-                      className="text-xs text-zinc-500 hover:text-amber-400 flex items-center gap-1 mt-0.5"
-                    >
+                    <a href={getTxUrl(record.hash, chainId)} target="_blank" rel="noopener noreferrer" className="text-xs text-zinc-500 hover:text-amber-400 flex items-center gap-1 mt-0.5">
                       View unwrap tx <ExternalLink className="h-3 w-3" />
                     </a>
                   </div>
@@ -597,6 +642,7 @@ function UnwrapPageInner() {
           </CardContent>
         </Card>
       )}
+
 
       <Card>
         <CardHeader className="pb-3">
@@ -634,16 +680,18 @@ function UnwrapPageInner() {
         </CardContent>
       </Card>
 
-      {selectedPair && (
-        <UnwrapForm
-          key={formKey}
-          pair={selectedPair}
-          initialUnwrapRequestId={resumeInfo?.unwrapRequestId}
-          initialUnwrapTxHash={resumeInfo?.unwrapTxHash}
-          initialAmount={resumeInfo?.amount}
-        />
-      )}
-    </div>
+      {
+        selectedPair && (
+          <UnwrapForm
+            key={formKey}
+            pair={selectedPair}
+            initialUnwrapRequestId={resumeInfo?.unwrapRequestId}
+            initialUnwrapTxHash={resumeInfo?.unwrapTxHash}
+            initialAmount={resumeInfo?.amount}
+          />
+        )
+      }
+    </div >
   );
 }
 
