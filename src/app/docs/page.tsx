@@ -234,7 +234,7 @@ const LINKS = [
   { label: 'FHEVM Documentation', href: 'https://docs.zama.org/fhevm' },
   { label: 'ERC-7984 Specification', href: 'https://eips.ethereum.org/EIPS/eip-7984' },
   { label: 'Zama GitHub', href: 'https://github.com/zama-ai' },
-  { label: 'Official Wrappers Registry', href: 'https://github.com/zama-ai/protocol-apps' },
+  { label: 'Official Wrappers Registry', href: 'hhttps://docs.zama.org/protocol/protocol-apps/addresses/testnet/sepolia#wrappers-registry' },
 ];
 
 export default function DocsPage() {
